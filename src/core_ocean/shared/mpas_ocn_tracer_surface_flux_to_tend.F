@@ -140,6 +140,7 @@ contains
 
       nCells = nCellsArray( 1 )
 
+      !$omp parallel
       !$omp do schedule(runtime) private(remainingFlux, k, iTracer)
       do iCell = 1, nCells
         remainingFlux = 1.0_RKIND
@@ -159,6 +160,7 @@ contains
         end if
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_timer_stop("surface_tracer_flux")
 
@@ -167,6 +169,7 @@ contains
       if (associated(surfaceTracerFluxRunoff)) then
         call mpas_timer_start("surface_tracer_runoff_flux")
 
+        !$omp parallel
         !$omp do schedule(runtime) private(remainingFlux, k, iTracer)
         do iCell = 1, nCells
           remainingFlux = 1.0_RKIND
@@ -187,6 +190,7 @@ contains
           end if
         end do
         !$omp end do
+        !$omp end parallel
 
         call mpas_timer_stop("surface_tracer_runoff_flux")
       end if

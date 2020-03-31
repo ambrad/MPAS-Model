@@ -123,6 +123,7 @@ contains
       nCells = nCellsArray( 2 )
 
       ! Build surface fluxes at cell centers
+      !$omp parallel
       !$omp do schedule(runtime) private(k)
       do iCell = 1, nCells
         do k = 1, maxLevelCell(iCell)
@@ -132,6 +133,7 @@ contains
         end do
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_timer_stop("tidal thickness tendency")
 

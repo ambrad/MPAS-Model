@@ -135,6 +135,7 @@ contains
 
       iLevel = 1  ! base surface flux restoring on tracer fields in the top layer
 
+      !$omp parallel
       !$omp do schedule(runtime) private(iTracer)
       do iCell=1,nCells
         do iTracer=1,nTracers
@@ -154,6 +155,7 @@ contains
         enddo
       enddo
       !$omp end do
+      !$omp end parallel
 
    !--------------------------------------------------------------------
 

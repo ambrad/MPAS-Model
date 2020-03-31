@@ -156,6 +156,7 @@ contains
 
       nEdges = nEdgesArray( 1 )
 
+      !$omp parallel
       !$omp do schedule(runtime) private(cell1, cell2, vertex1, vertex2, invLength1, invLength2, k, u_diffusion, visc2)
       do iEdge = 1, nEdges
          cell1 = cellsOnEdge(1,iEdge)
@@ -184,6 +185,7 @@ contains
          end do
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_timer_stop("vel del2")
 

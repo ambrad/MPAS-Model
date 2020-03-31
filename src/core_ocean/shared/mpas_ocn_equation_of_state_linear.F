@@ -171,6 +171,7 @@ contains
 
       if (trim(displacementType) == 'surfaceDisplaced') then
 
+         !$omp parallel
          !$omp do schedule(runtime) private(k)
          do iCell = 1, nCells
          do k = 1, nVertLevels
@@ -185,9 +186,11 @@ contains
          end do
          end do
          !$omp end do
+         !$omp end parallel
 
       else  ! all other displacement types
 
+         !$omp parallel
          !$omp do schedule(runtime) private(k)
          do iCell = 1, nCells
          do k = 1, nVertLevels
@@ -202,6 +205,7 @@ contains
          end do
          end do
          !$omp end do
+         !$omp end parallel
 
       endif
 
@@ -305,6 +309,7 @@ contains
 
       if (trim(displacementType) == 'surfaceDisplaced') then
 
+         !$omp parallel
          !$omp do schedule(runtime) private(k)
          do iCell = 1, nCells
          do k = 1, nVertLevels
@@ -325,9 +330,11 @@ contains
          end do
          end do
          !$omp end do
+         !$omp end parallel
 
       else  ! all other displacement types
 
+         !$omp parallel
          !$omp do schedule(runtime) private(k)
          do iCell = 1, nCells
          do k = 1, nVertLevels
@@ -348,6 +355,7 @@ contains
          end do
          end do
          !$omp end do
+         !$omp end parallel
 
       endif
 

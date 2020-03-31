@@ -137,7 +137,10 @@ contains
 
       nEdges = nEdgesArray( 1 )
 
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) &
+      !$omp private(iEdge, cell1, cell2, k, vertAleTransportTopEdge) &
+      !$omp firstprivate(w_dudzTopEdge)
       do iEdge = 1, nEdges
         cell1 = cellsOnEdge(1,iEdge)
         cell2 = cellsOnEdge(2,iEdge)
@@ -158,6 +161,7 @@ contains
         enddo
       enddo
       !$omp end do
+      !$omp end parallel
 
       deallocate(w_dudzTopEdge)
 
