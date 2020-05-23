@@ -183,14 +183,10 @@ contains
 
       gradDensityEdge => gradDensityEdgeField%array
 
-      allocate (rightHandSide(nVertLevels))
-      allocate (tridiagA(nVertLevels))
-      allocate (tridiagB(nVertLevels))
-      allocate (tridiagC(nVertLevels))
-
       nCells = nCellsArray(size(nCellsArray))
       nEdges = nEdgesArray(size(nEdgesArray))
 
+      !$omp parallel
       !$omp do schedule(runtime) private(k)
       do iEdge = 1, nEdges
          do k = 1, nVertLevels
@@ -216,23 +212,26 @@ contains
          end do
       end do
       !$omp end do
-      allocate (dzTop(nVertLevels + 1))
-      allocate (dTdzTop(nVertLevels + 1))
-      allocate (dSdzTop(nVertLevels + 1))
-      allocate (k33Norm(nVertLevels + 1))
-
       !$omp do schedule(runtime)
       do iCell = 1, nCells
          kappaGMCell(:, iCell) = 1.0_RKIND
          kappaRediSfcTaper(:, iCell) = 1.0_RKIND
       end do
       !$omp end do
+      !$omp end parallel
+
+      allocate (dzTop(nVertLevels + 1))
+      allocate (dTdzTop(nVertLevels + 1))
+      allocate (dSdzTop(nVertLevels + 1))
+      allocate (k33Norm(nVertLevels + 1))
 
       if (local_config_GM_kappa_lat_depth_variable) then
 
-         !$omp do schedule(runtime) private(maxLocation, cell1, cell2, k, BruntVaisalaFreqTopEdge, maxN)
+         !$omp parallel
+         !$omp do schedule(runtime) &
+         !$omp private(k, maxN, maxLocation, BruntVaisalaFreqTopEdge)
          do iCell = 1, nCells
-            k = min(maxLevelCell(iCell) - 1, max(1, indMLD(iCell)))
+            k = min(maxLevelCell(iCell) - 1, max(1, indMLD(iCell))) ! debug, mdt :: delete this line?
             k = 1
             maxN = max(BruntVaisalaFreqTop(k, iCell), 0.0_RKIND)
             do while (BruntVaisalaFreqTop(k + 1, iCell) > maxN .and. k < maxLevelCell(iCell) - 1)
@@ -250,9 +249,11 @@ contains
             end do
          end do
          !$omp end do
+         !$omp end parallel
       end if
 
       if (config_Redi_use_surface_taper) then
+         !$omp parallel
          !$omp do schedule (runtime) private(zMLD, k)
          do iCell = 1, nCells
             k = max(1, indMLD(iCell))
@@ -263,12 +264,15 @@ contains
             end do
          end do
          !$omp end do
+         !$omp end parallel
       end if
 
       nCells = nCellsArray(3)
-      !$omp do schedule(runtime) private(i, k, iEdge, cell1, cell2, iCellSelf, &
-      !$omp& invAreaCell, dcEdgeInv, areaEdge, drhoDT, drhoDS, dTdx, dSdx, drhoDx, &
-      !$omp& sfcTaper, sfcTaperUp, sfcTaperDown, slopeTaperDown, slopeTaperUp)
+      !$omp parallel
+      !$omp do schedule(runtime) &
+      !$omp private(invAreaCell, k33Norm, dzTop, dTdzTop, dSdzTop, i, iEdge, cell1, cell2, &
+      !$omp         iCellSelf, dcEdgeInv, areaEdge, drhoDT, drhoDS, dTdx, dSdx, drhoDx, &
+      !$omp         slopeTaperUp, slopeTaperDown, sfcTaperUp, sfcTaperDown, sfcTaper)
       do iCell = 1, nCells
          invAreaCell = 1.0_RKIND/areaCell(iCell)
          k33(1:maxLevelCell(iCell) + 1, iCell) = 0.0_RKIND
@@ -380,6 +384,7 @@ contains
          k33(maxLevelCell(iCell) + 1, iCell) = 0.0_RKIND
       end do ! iCell
       !$omp end do
+      !$omp end parallel
 
       deallocate (dzTop)
       deallocate (dTdzTop)
@@ -389,11 +394,13 @@ contains
       ! allow disabling of K33 for testing
       if (config_disable_redi_k33) then
          nCells = nCellsArray(size(nCellsArray))
+         !$omp parallel
          !$omp do schedule(runtime)
          do iCell = 1, nCells
             k33(:, iCell) = 0.0_RKIND
          end do
          !$omp end do
+         !$omp end parallel
       end if
 
       !--------------------------------------------------------------------
@@ -404,7 +411,8 @@ contains
 
       if (config_use_GM) then
          nEdges = nEdgesArray(3)
-         !$omp do schedule(runtime) private(cell1, cell2, dcEdgeInv, &
+         !$omp parallel
+         !$omp do schedule(runtime) private(cell1, cell2, dcEdgeInv, k, &
          !$omp& drhoDT, drhoDS, dTdx, dSdx, drhoDx)
          do iEdge = 1, nEdges
             cell1 = cellsOnEdge(1, iEdge)
@@ -428,10 +436,12 @@ contains
             end do
          end do
          !$omp end do
+         !$omp end parallel
 
          nEdges = nEdgesArray(3)
 
          if (local_config_GM_lat_variable_c2) then
+            !$omp parallel
             !$omp do schedule(runtime) private(cell1, cell2, sumN2, ltSum, countN2, BruntVaisalaFreqTopEdge)
             do iEdge = 1, nEdges
                cell1 = cellsOnEdge(1, iEdge)
@@ -455,18 +465,29 @@ contains
 
             end do
             !$omp end do
+            !$omp end parallel
 
          else
+            !$omp parallel
             !$omp do schedule(runtime)
             do iEdge = 1, nEdges
                cGMphaseSpeed(iEdge) = config_GM_constant_gravWaveSpeed
             end do
             !$omp end do
+            !$omp end parallel
          end if
 
          nEdges = nEdgesArray(3)
-         !$omp do schedule(runtime) private(cell1, cell2, k,  gradDensityTopOfEdge, &
-         !$omp& kappaGMEdge, BruntVaisalaFreqTopEdge, N)
+         !$omp parallel
+
+         allocate (rightHandSide(nVertLevels))
+         allocate (tridiagA(nVertLevels))
+         allocate (tridiagB(nVertLevels))
+         allocate (tridiagC(nVertLevels))
+
+         !$omp do schedule(runtime) &
+         !$omp private(cell1, cell2, k,  gradDensityTopOfEdge, kappaGMEdge, BruntVaisalaFreqTopEdge) &
+         !$omp firstprivate(tridiagA, tridiagB, tridiagC, rightHandSide, N)
          do iEdge = 1, nEdges
             cell1 = cellsOnEdge(1, iEdge)
             cell2 = cellsOnEdge(2, iEdge)
@@ -536,9 +557,11 @@ contains
             end if
          end do
          !$omp end do
+         !$omp end parallel
 
          nEdges = nEdgesArray(3)
          ! Compute normalGMBolusVelocity from the stream function
+         !$omp parallel
          !$omp do schedule(runtime) private(k)
          do iEdge = 1, nEdges
             do k = 1, maxLevelEdgeTop(iEdge)
@@ -547,10 +570,12 @@ contains
             end do
          end do
          !$omp end do
+         !$omp end parallel
 
          nCells = nCellsArray(1)
 
          ! Interpolate gmStreamFuncTopOfEdge to cell centers for visualization
+         !$omp parallel
          !$omp do schedule(runtime) private(i, iEdge, areaEdge, k, rtmp)
          do iCell = 1, nCells
             gmStreamFuncTopOfCell(:, iCell) = 0.0_RKIND
@@ -572,11 +597,7 @@ contains
             gmStreamFuncTopOfCell(:, iCell) = gmStreamFuncTopOfCell(:, iCell)/areaCell(iCell)
          end do
          !$omp end do
-
-         deallocate (rightHandSide)
-         deallocate (tridiagA)
-         deallocate (tridiagB)
-         deallocate (tridiagC)
+         !$omp end parallel
 
       end if !end config_use_GM
 
@@ -714,11 +735,13 @@ contains
 
          RediGMinitValue = 1.0_RKIND
          if (config_GM_closure == 'constant') then
+            !$omp parallel
             !$omp do schedule(runtime)
             do iEdge = 1, nEdges
                gmBolusKappa(iEdge) = config_GM_kappa
             end do
             !$omp end do
+            !$omp end parallel
             RediGMinitValue = 1.0_RKIND
          else if (config_GM_closure == 'N2_dependent') then
             local_config_GM_lat_variable_c2 = .true.
@@ -726,11 +749,13 @@ contains
 
             RediGMinitValue = 0.0_RKIND
             ! for N2 dependence, we still assign Kappa as a constant.
+            !$omp parallel
             !$omp do schedule(runtime)
             do iEdge = 1, nEdges
                gmBolusKappa(iEdge) = config_GM_kappa
             end do
             !$omp end do
+            !$omp end parallel
          else
             call mpas_log_write('Invalid choice of config_GM_closure.', MPAS_LOG_CRIT)
             err = 1
@@ -742,6 +767,7 @@ contains
             ! Nothing to do, as we just keep the same assignment as above.
          else if (config_eddying_resolution_taper == 'ramp') then
             sqrtPiInv = 1.0_RKIND/sqrt(pii)
+            !$omp parallel
             !$omp do schedule(runtime) private( avgCellDiameter)
             do iEdge = 1, nEdges
                avgCellDiameter = sqrtPiInv*(sqrt(areaCell(cellsOnEdge(1, iEdge))) + sqrt(areaCell(cellsOnEdge(2, iEdge))))
@@ -756,6 +782,7 @@ contains
                end if
             end do
             !$omp end do
+            !$omp end parallel
          else
             call mpas_log_write('Invalid choice of config_eddying_resolution_taper.', MPAS_LOG_CRIT)
             err = 1
