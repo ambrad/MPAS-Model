@@ -152,7 +152,7 @@ contains
       if (configALEthicknessProportionality==1) then ! restingThickness_times_weights
 
          !$omp parallel
-         !$omp do schedule(runtime) private(kMax, thicknessSum, k, SSH_ALE_Thickness)
+         !$omp do schedule(runtime) private(kMax, thicknessSum, k) firstprivate(SSH_ALE_Thickness)
          do iCell = 1, nCells
             kMax = maxLevelCell(iCell)
    
