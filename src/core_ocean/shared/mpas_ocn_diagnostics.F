@@ -274,7 +274,7 @@ contains
 
       if (.not. config_use_wetting_drying .or. (config_use_wetting_drying .and. (trim(config_thickness_flux_type) .eq. 'centered'))) then
         !$omp parallel
-        !$omp do schedule(runtime) private(cell1, cell2, k, iEdge)
+        !$omp do schedule(runtime) private(cell1, cell2, k)
         do iEdge = 1, nEdges
           ! initialize layerThicknessEdge to avoid divide by zero and NaN problems.
           layerThicknessEdge(:, iEdge) = -1.0e34_RKIND
@@ -291,7 +291,7 @@ contains
         if (config_use_wetting_drying .and. (trim(config_thickness_flux_type) .ne. 'centered')) then
           if ( trim(config_thickness_flux_type) .eq. 'upwind') then
             !$omp parallel
-            !$omp do schedule(runtime) private(cell1, cell2, k, iEdge)
+            !$omp do schedule(runtime) private(cell1, cell2, k)
             do iEdge = 1, nEdges
               ! initialize layerThicknessEdge to avoid divide by zero and NaN problems.
               layerThicknessEdge(:, iEdge) = -1.0e34_RKIND
@@ -334,7 +334,7 @@ contains
       nCells = nCellsArray( 1 )
 
       !$omp parallel
-      !$omp do schedule(runtime) private(invAreaCell1, i, j, k, iVertex, iCell)
+      !$omp do schedule(runtime) private(invAreaCell1, i, j, k, iVertex)
       do iCell = 1, nCells
         relativeVorticityCell(:,iCell) = 0.0_RKIND
         invAreaCell1 = 1.0_RKIND / areaCell(iCell)
@@ -360,7 +360,7 @@ contains
 
       !$omp parallel
       !$omp do schedule(runtime) &
-      !$omp private(iCell, i, iEdge, invAreaCell1, edgeSignOnCell_temp, dcEdge_temp, dvEdge_temp, &
+      !$omp private(i, iEdge, invAreaCell1, edgeSignOnCell_temp, dcEdge_temp, dvEdge_temp, &
       !$omp         k, r_tmp, div_hu, div_huTransport, div_huGMBolus)
       do iCell = 1, nCells
          divergence(:, iCell) = 0.0_RKIND
@@ -407,7 +407,7 @@ contains
       nEdges = nEdgesArray( 2 )
 
       !$omp parallel
-      !$omp do schedule(runtime) private(iEdge, i, eoe, weightsOnEdge_temp, k)
+      !$omp do schedule(runtime) private(i, eoe, weightsOnEdge_temp, k)
       do iEdge = 1, nEdges
          tangentialVelocity(:, iEdge) = 0.0_RKIND
          ! Compute v (tangential) velocities
@@ -661,7 +661,7 @@ contains
         allocate(pTop(nVertLevels))
 
         !$omp parallel
-        !$omp do schedule(runtime) private(iCell, pTop, k)
+        !$omp do schedule(runtime) private(pTop, k)
         do iCell = 1, nCells
 
            ! assume atmospheric pressure at the surface is zero for now.
@@ -799,7 +799,7 @@ contains
         nCells = nCellsArray( 1 )
 
         !$omp parallel
-        !$omp do schedule(runtime) private(iCell, surfaceLayerDepth, sumSurfaceLayer, k, rSurfaceLayer)
+        !$omp do schedule(runtime) private(surfaceLayerDepth, sumSurfaceLayer, k, rSurfaceLayer)
         do iCell=1,nCells
           surfaceLayerDepth = config_cvmix_kpp_surface_layer_averaging
           sumSurfaceLayer=0.0_RKIND
@@ -1223,7 +1223,7 @@ contains
       call mpas_pool_get_dimension(meshPool, 'nEdges', nEdges)
 
       !$omp parallel
-      !$omp do schedule(runtime) private(iEdge, normalThicknessFluxSum, thicknessSum, k, vertSum)
+      !$omp do schedule(runtime) private(normalThicknessFluxSum, thicknessSum, k, vertSum)
       do iEdge = 1, nEdges
 
         ! thicknessSum is initialized outside the loop because on land boundaries
@@ -1294,7 +1294,7 @@ contains
       call mpas_pool_get_dimension(meshPool, 'nEdges', nEdges)
 
       !$omp parallel
-      !$omp do schedule(runtime) private(iEdge, normalThicknessFluxSum, thicknessSum, k, vertSum)
+      !$omp do schedule(runtime) private(normalThicknessFluxSum, thicknessSum, k, vertSum)
       do iEdge = 1, nEdges
 
         ! thicknessSum is initialized outside the loop because on land boundaries
@@ -1509,7 +1509,7 @@ contains
 
       !$omp parallel
       !$omp do schedule(runtime) &
-      !$omp private(iCell, invAreaCell, fracAbsorbed, fracAbsorbedRunoff, deltaVelocitySquared, i, &
+      !$omp private(invAreaCell, fracAbsorbed, fracAbsorbedRunoff, deltaVelocitySquared, i, &
       !$omp         iEdge, factor, delU2)
       do iCell = 1, nCells
        invAreaCell = 1.0_RKIND / areaCell(iCell)
@@ -1776,7 +1776,7 @@ contains
       !$omp end do
 
       ! average temperature and salinity over horizontal neighbors and the sub-ice-shelf boundary layer
-      !$omp do schedule(runtime) private(iCell, blThickness, iLevel, dz)
+      !$omp do schedule(runtime) private(blThickness, iLevel, dz)
       do iCell = 1, nCells
          blThickness = 0.0_RKIND
          blTempScratch(iCell) = 0.0_RKIND

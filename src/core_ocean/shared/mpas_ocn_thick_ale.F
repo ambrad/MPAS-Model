@@ -174,7 +174,7 @@ contains
    
          elseif (configALEthicknessProportionality==2) then ! weights_only
          !$omp parallel
-         !$omp do schedule(runtime) private(iCell, kMax, weightSum, k)
+         !$omp do schedule(runtime) private(kMax, weightSum, k)
          do iCell = 1, nCells
             kMax = maxLevelCell(iCell)
    
@@ -218,7 +218,7 @@ contains
 
          !$omp parallel
          !$omp do schedule(runtime) &
-         !$omp private(iCell, kMax, prelim_ALE_Thickness, remainder, k, newThickness, &
+         !$omp private(kMax, prelim_ALE_Thickness, remainder, k, newThickness, &
          !$omp         min_ALE_thickness_down, min_ALE_thickness_up)
          do iCell = 1, nCells
             kMax = maxLevelCell(iCell)

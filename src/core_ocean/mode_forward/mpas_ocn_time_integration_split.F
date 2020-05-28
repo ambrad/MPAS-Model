@@ -322,7 +322,7 @@ module ocn_time_integration_split
          ! Initialize * variables that are used to compute baroclinic tendencies below.
 
          !$omp parallel
-         !$omp do schedule(runtime) private(k, iEdge)
+         !$omp do schedule(runtime) private(k)
          do iEdge = 1, nEdges
             do k = 1, nVertLevels !maxLevelEdgeTop % array(iEdge)
 
@@ -341,7 +341,7 @@ module ocn_time_integration_split
          end do
          !$omp end do
 
-         !$omp do schedule(runtime) private(k, iCell)
+         !$omp do schedule(runtime) private(k)
          do iCell = 1, nCells
             sshNew(iCell) = sshCur(iCell)
             do k = 1, maxLevelCell(iCell)
@@ -361,7 +361,7 @@ module ocn_time_integration_split
 
                if ( associated(tracersGroupCur) .and. associated(tracersGroupNew) ) then
                   !$omp parallel
-                  !$omp do schedule(runtime) private(k, iCell)
+                  !$omp do schedule(runtime) private(k)
                   do iCell = 1, nCells
                      do k = 1, maxLevelCell(iCell)
                         tracersGroupNew(:,k,iCell) = tracersGroupCur(:,k,iCell)
@@ -376,7 +376,7 @@ module ocn_time_integration_split
 
          if (associated(highFreqThicknessNew)) then
             !$omp parallel
-            !$omp do schedule(runtime) private(iCell)
+            !$omp do schedule(runtime) 
             do iCell = 1, nCells
                highFreqThicknessNew(:, iCell) = highFreqThicknessCur(:, iCell)
             end do
@@ -386,7 +386,7 @@ module ocn_time_integration_split
 
          if (associated(lowFreqDivergenceNew)) then
             !$omp parallel
-            !$omp do schedule(runtime) private(iCell)
+            !$omp do schedule(runtime) 
             do iCell = 1, nCells
                lowFreqDivergenceNew(:, iCell) = lowFreqDivergenceCur(:, iCell)
             end do
@@ -485,7 +485,7 @@ module ocn_time_integration_split
                nCells = nCellsPtr
 
                !$omp parallel
-               !$omp do schedule(runtime) private(k, iCell)
+               !$omp do schedule(runtime) private(k)
                do iCell = 1, nCells
                   do k = 1, maxLevelCell(iCell)
                      ! this is h^{hf}_{n+1}
@@ -580,7 +580,7 @@ module ocn_time_integration_split
 
                !$omp parallel
                !$omp do schedule(runtime) &
-               !$omp private(iEdge, cell1, cell2, uTemp, k, normalThicknessFluxSum, thicknessSum)
+               !$omp private(cell1, cell2, uTemp, k, normalThicknessFluxSum, thicknessSum)
                do iEdge = 1, nEdges
                   cell1 = cellsOnEdge(1,iEdge)
                   cell2 = cellsOnEdge(2,iEdge)
@@ -687,7 +687,7 @@ module ocn_time_integration_split
                ! uNew=normalBaroclinicVelocityNew
 
                !$omp parallel
-               !$omp do schedule(runtime) private(k, iEdge)
+               !$omp do schedule(runtime) private(k)
                do iEdge = 1, nEdges
                   normalBarotropicVelocityNew(iEdge) = 0.0_RKIND
                   do k = 1, nVertLevels
@@ -738,7 +738,7 @@ module ocn_time_integration_split
 
                if (config_filter_btr_mode) then
                   !$omp parallel
-                  !$omp do schedule(runtime) private(iEdge)
+                  !$omp do schedule(runtime) 
                   do iEdge = 1, nEdges
                      barotropicForcing(iEdge) = 0.0_RKIND
                   end do
@@ -747,14 +747,14 @@ module ocn_time_integration_split
                endif
 
                !$omp parallel
-               !$omp do schedule(runtime) private(iCell)
+               !$omp do schedule(runtime) 
                do iCell = 1, nCells
                   ! sshSubcycleOld = sshOld
                   sshSubcycleCur(iCell) = sshCur(iCell)
                end do
                !$omp end do
 
-               !$omp do schedule(runtime) private(iEdge)
+               !$omp do schedule(runtime) 
                do iEdge = 1, nEdges
 
                   ! normalBarotropicVelocitySubcycleOld = normalBarotropicVelocityOld
@@ -854,7 +854,7 @@ module ocn_time_integration_split
 
                      !$omp parallel
                      !$omp do schedule(runtime) &
-                     !$omp private(iEdge, temp_mask, cell1, cell2, CoriolisTerm, i, eoe)
+                     !$omp private(temp_mask, cell1, cell2, CoriolisTerm, i, eoe)
                      do iEdge = 1, nEdges
 
                         temp_mask = edgeMask(1, iEdge)
@@ -939,7 +939,7 @@ module ocn_time_integration_split
 
                 !$omp parallel
                 !$omp do schedule(runtime) &
-                !$omp private(iCell, i, iEdge, cell1, cell2, sshEdge, thicknessSum, flux)
+                !$omp private(i, iEdge, cell1, cell2, sshEdge, thicknessSum, flux)
                 do iCell = 1, nCells
                   sshTend(iCell) = 0.0_RKIND
                   do i = 1, nEdgesOnCell(iCell)
@@ -994,7 +994,7 @@ module ocn_time_integration_split
 
                   !$omp parallel
                   !$omp do schedule(runtime) &
-                  !$omp private(iEdge, cell1, cell2, sshEdge, thicknessSum, flux)
+                  !$omp private(cell1, cell2, sshEdge, thicknessSum, flux)
                   do iEdge = 1, nEdges
                      cell1 = cellsOnEdge(1,iEdge)
                      cell2 = cellsOnEdge(2,iEdge)
@@ -1089,7 +1089,7 @@ module ocn_time_integration_split
                    nEdges = nEdgesArray( min(edgeHaloComputeCounter + 1, config_num_halos + 1) )
 
                    !$omp parallel
-                   !$omp do schedule(runtime) private(iEdge)
+                   !$omp do schedule(runtime) 
                    do iEdge = 1, nEdges+1
                       btrvel_temp(iEdge) = normalBarotropicVelocitySubcycleNew(iEdge)
                    end do
@@ -1100,7 +1100,7 @@ module ocn_time_integration_split
 
                    !$omp parallel
                    !$omp do schedule(runtime) &
-                   !$omp private(iEdge, temp_mask, cell1, cell2, coriolisTerm, eoe, sshCell1, sshCell2)
+                   !$omp private(temp_mask, cell1, cell2, coriolisTerm, eoe, sshCell1, sshCell2)
                    do iEdge = 1, nEdges
 
                      ! asarje: added to avoid redundant computations based on mask
@@ -1299,7 +1299,7 @@ module ocn_time_integration_split
                   nEdges = nEdgesPtr
 
                   !$omp parallel
-                  !$omp do schedule(runtime) private(iEdge)
+                  !$omp do schedule(runtime) 
                   do iEdge = 1, nEdges
                        normalBarotropicVelocityNew(iEdge) = normalBarotropicVelocityNew(iEdge) &
                                                           + normalBarotropicVelocitySubcycleNew(iEdge)
@@ -1344,7 +1344,7 @@ module ocn_time_integration_split
                nEdges = nEdgesArray(1)
 
                !$omp parallel
-               !$omp do schedule(runtime) private(iEdge)
+               !$omp do schedule(runtime) 
                do iEdge = 1, nEdges
                   barotropicThicknessFlux(iEdge) = barotropicThicknessFlux(iEdge) &
                       / (nBtrSubcycles * config_btr_subcycle_loop_factor)
@@ -1420,7 +1420,7 @@ module ocn_time_integration_split
 
                !$omp parallel
                !$omp do schedule(runtime) &
-               !$omp private(iEdge, uTemp, normalThicknessFluxSum, thicknessSum, k, &
+               !$omp private(uTemp, normalThicknessFluxSum, thicknessSum, k, &
                !$omp         normalVelocityCorrection)
                do iEdge = 1, nEdges
 
@@ -1631,7 +1631,7 @@ module ocn_time_integration_split
                ! then all the tracers needed the last time through.
 
                !$omp parallel
-               !$omp do schedule(runtime) private(iCell, k, temp_h, temp, i)
+               !$omp do schedule(runtime) private(k, temp_h, temp, i)
                do iCell = 1, nCells
                   ! sshNew is a pointer, defined above.
                   do k = 1, maxLevelCell(iCell)
@@ -1657,7 +1657,7 @@ module ocn_time_integration_split
 
                if (config_use_freq_filtered_thickness) then
                   !$omp parallel
-                  !$omp do schedule(runtime) private(iCell, k, temp)
+                  !$omp do schedule(runtime) private(k, temp)
                   do iCell = 1, nCells
                      do k = 1, maxLevelCell(iCell)
 
@@ -1679,7 +1679,7 @@ module ocn_time_integration_split
                end if
 
                !$omp parallel
-               !$omp do schedule(runtime) private(k, iEdge)
+               !$omp do schedule(runtime) private(k)
                do iEdge = 1, nEdges
 
                   do k = 1, nVertLevels
@@ -1708,7 +1708,7 @@ module ocn_time_integration_split
             elseif (split_explicit_step == config_n_ts_iter) then
 
                !$omp parallel
-               !$omp do schedule(runtime) private(k, iCell)
+               !$omp do schedule(runtime) private(k)
                do iCell = 1, nCells
                   do k = 1, maxLevelCell(iCell)
                      ! this is h_{n+1}
@@ -1731,7 +1731,7 @@ module ocn_time_integration_split
                   call mpas_pool_get_array(diagnosticsPool, 'layerThicknessEdge', layerThicknessEdge)
 
                   !$omp parallel
-                  !$omp do schedule(runtime) private(k, iEdge)
+                  !$omp do schedule(runtime) private(k)
                   do iEdge = 1, nEdges
                      do k= 1, maxLevelEdgeTop(iEdge)
                         activeTracerHorizontalAdvectionEdgeFlux(:,k,iEdge) = &
@@ -1741,7 +1741,7 @@ module ocn_time_integration_split
                   enddo
                   !$omp end do
 
-                  !$omp do schedule(runtime) private(k, iCell)
+                  !$omp do schedule(runtime) private(k)
                   do iCell = 1, nCells
                      do k= 1, maxLevelCell(iCell)
                         activeTracerHorizontalAdvectionTendency(:,k,iCell) = &
@@ -1783,7 +1783,7 @@ module ocn_time_integration_split
                         call mpas_pool_get_array(tracersTendPool, modifiedGroupName, tracersGroupTend)
 
                         !$omp parallel
-                        !$omp do schedule(runtime) private(k, iCell)
+                        !$omp do schedule(runtime) private(k)
                         do iCell = 1, nCells
                            do k = 1, maxLevelCell(iCell)
                               tracersGroupNew(:,k,iCell) = (tracersGroupCur(:,k,iCell) * layerThicknessCur(k,iCell) + dt &
@@ -1796,7 +1796,7 @@ module ocn_time_integration_split
                         ! limit salinity in separate loop
                         if ( trim(groupItr % memberName) == 'activeTracers' ) then
                            !$omp parallel
-                           !$omp do schedule(runtime) private(k, iCell)
+                           !$omp do schedule(runtime) private(k)
                            do iCell = 1, nCells
                               do k = 1, maxLevelCell(iCell)
                                  tracersGroupNew(indexSalinity,k,iCell) = max(0.001_RKIND, tracersGroupNew(indexSalinity,k,iCell))
@@ -1812,7 +1812,7 @@ module ocn_time_integration_split
                            call mpas_pool_get_array(meshPool, 'lonCell', lonCell)
                            if (config_reset_debugTracers_near_surface) then
                               !$omp parallel
-                              !$omp do schedule(runtime) private(iCell, k, lat)
+                              !$omp do schedule(runtime) private(k, lat)
                               do iCell = 1, nCells
 
                                 ! Reset tracer1 to 2 in top n layers
@@ -1866,7 +1866,7 @@ module ocn_time_integration_split
 
                if (config_use_freq_filtered_thickness) then
                   !$omp parallel
-                  !$omp do schedule(runtime) private(k, iCell)
+                  !$omp do schedule(runtime) private(k)
                   do iCell = 1, nCells
                      do k = 1, maxLevelCell(iCell)
 
@@ -1890,7 +1890,7 @@ module ocn_time_integration_split
                ! so normalBaroclinicVelocity does not have to be recomputed here.
 
                !$omp parallel
-               !$omp do schedule(runtime) private(k, iEdge)
+               !$omp do schedule(runtime) private(k)
                do iEdge = 1, nEdges
                   do k = 1, maxLevelEdgeTop(iEdge)
                      normalVelocityNew(k,iEdge) = normalBarotropicVelocityNew(iEdge) + 2 * normalBaroclinicVelocityNew(k,iEdge) &
@@ -2026,7 +2026,7 @@ module ocn_time_integration_split
 
          if (config_prescribe_velocity) then
             !$omp parallel
-            !$omp do schedule(runtime) private(iEdge)
+            !$omp do schedule(runtime) 
             do iEdge = 1, nEdges
                normalVelocityNew(:, iEdge) = normalVelocityCur(:, iEdge)
             end do
@@ -2036,7 +2036,7 @@ module ocn_time_integration_split
 
          if (config_prescribe_thickness) then
             !$omp parallel
-            !$omp do schedule(runtime) private(iCell)
+            !$omp do schedule(runtime) 
             do iCell = 1, nCells
                layerThicknessNew(:, iCell) = layerThicknessCur(:, iCell)
             end do
@@ -2070,7 +2070,7 @@ module ocn_time_integration_split
          call mpas_timer_stop('se final mpas reconstruct')
 
          !$omp parallel
-         !$omp do schedule(runtime) private(iCell)
+         !$omp do schedule(runtime) 
          do iCell = 1, nCells
             surfaceVelocity(indexSurfaceVelocityZonal, iCell) = velocityZonal(1, iCell)
             surfaceVelocity(indexSurfaceVelocityMeridional, iCell) = velocityMeridional(1, iCell)

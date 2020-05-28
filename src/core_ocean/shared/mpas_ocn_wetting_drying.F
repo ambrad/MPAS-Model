@@ -288,7 +288,7 @@ contains
 
      ! prevent drying from happening with selective wettingVelocity
      !$omp parallel
-     !$omp do schedule(runtime) private(iEdge, k)
+     !$omp do schedule(runtime) private(k)
      do iEdge = 1, nEdges
        do k = 1, maxLevelEdgeBot(iEdge)
          if (abs(normalTransportVelocity(k,iEdge) + wettingVelocity(k,iEdge)) < eps)  then
