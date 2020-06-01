@@ -413,7 +413,7 @@ contains
          nEdges = nEdgesArray(3)
          !$omp parallel
          !$omp do schedule(runtime) private(cell1, cell2, dcEdgeInv, k, &
-         !$omp& drhoDT, drhoDS, dTdx, dSdx, drhoDx)
+         !$omp       drhoDT, drhoDS, dTdx, dSdx, drhoDx)
          do iEdge = 1, nEdges
             cell1 = cellsOnEdge(1, iEdge)
             cell2 = cellsOnEdge(2, iEdge)
@@ -478,16 +478,16 @@ contains
          end if
 
          nEdges = nEdgesArray(3)
-         !$omp parallel
+         !!$omp parallel
 
          allocate (rightHandSide(nVertLevels))
          allocate (tridiagA(nVertLevels))
          allocate (tridiagB(nVertLevels))
          allocate (tridiagC(nVertLevels))
 
-         !$omp do schedule(runtime) &
-         !$omp private(cell1, cell2, k,  gradDensityTopOfEdge, kappaGMEdge, BruntVaisalaFreqTopEdge) &
-         !$omp firstprivate(tridiagA, tridiagB, tridiagC, rightHandSide, N)
+         !!$omp do schedule(runtime) &
+         !!$omp private(cell1, cell2, k,  gradDensityTopOfEdge, kappaGMEdge, BruntVaisalaFreqTopEdge) &
+         !!$omp firstprivate(tridiagA, tridiagB, tridiagC, rightHandSide, N)
          do iEdge = 1, nEdges
             cell1 = cellsOnEdge(1, iEdge)
             cell2 = cellsOnEdge(2, iEdge)
@@ -556,8 +556,8 @@ contains
                                       gmStreamFuncTopOfEdge(2:maxLevelEdgeTop(iEdge), iEdge), N)
             end if
          end do
-         !$omp end do
-         !$omp end parallel
+         !!$omp end do
+         !!$omp end parallel
 
          nEdges = nEdgesArray(3)
          ! Compute normalGMBolusVelocity from the stream function
