@@ -136,6 +136,7 @@ module ocn_tracer_advection_std
       ! Loop over tracers. One tracer is advected at a time. It is copied into a temporary array in order to improve locality
       do iTracer = 1, num_tracers
         ! Initialize variables for use in this iTracer iteration
+        !$omp parallel
         !$omp do schedule(runtime)
         do iCell = 1, nCells
            tracer_cur(:, iCell) = tracers(iTracer, :, iCell)
@@ -233,9 +234,9 @@ module ocn_tracer_advection_std
           end do ! k loop
         end do ! iCell loop
         !$omp end do
+        !$omp end parallel
       end do ! iTracer loop
 
-      call mpas_threading_barrier()
       call mpas_deallocate_scratch_field(highOrderHorizFluxField, .true.)
       call mpas_deallocate_scratch_field(tracerCurField, .true.)
       call mpas_deallocate_scratch_field(highOrderVertFluxField, .true.)

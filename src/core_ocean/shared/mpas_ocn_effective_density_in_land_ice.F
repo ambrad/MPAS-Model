@@ -147,6 +147,7 @@ contains
       call mpas_allocate_scratch_field(effectiveDensityField, .true.)
       effectiveDensityScratch => effectiveDensityField % array
 
+      !$omp parallel
       !$omp do schedule(runtime)
       do iCell = 1, nCells
          ! TODO: should only apply to floating land ice, once wetting/drying is supported
@@ -174,6 +175,7 @@ contains
          effectiveDensityNew(iCell) = effectiveDensityNew(iCell)/weightSum
       end do
       !$omp end do
+      !$omp end parallel
       call mpas_deallocate_scratch_field(effectiveDensityField, .true.)
 
    !--------------------------------------------------------------------

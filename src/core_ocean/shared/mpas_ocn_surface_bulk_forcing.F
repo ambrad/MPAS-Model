@@ -196,6 +196,7 @@ contains
       nCells = nCellsArray( 3 )
 
       ! Convert coupled climate model wind stress to MPAS-O wind stress
+      !$omp parallel
       !$omp do schedule(runtime) private(cell1, cell2, zonalAverage, meridionalAverage)
       do iEdge = 1, nEdges
         cell1 = cellsOnEdge(1, iEdge)
@@ -216,6 +217,7 @@ contains
                                       + windStressMeridional(iCell)**2 )
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_timer_stop("bulk_ws")
 
@@ -294,6 +296,7 @@ contains
       nCells = nCellsArray( 3 )
 
       ! Build surface fluxes at cell centers
+      !$omp parallel
       !$omp do schedule(runtime)
       do iCell = 1, nCells
         surfaceThicknessFlux(iCell) = surfaceThicknessFlux(iCell) + ( snowFlux(iCell) + rainFlux(iCell) + evaporationFlux(iCell) &
@@ -301,6 +304,7 @@ contains
         surfaceThicknessFluxRunoff(iCell) = riverRunoffFlux(iCell) / rho_sw
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_timer_stop("bulk_thick")
 
@@ -433,6 +437,7 @@ contains
       nCells = nCellsArray( 3 )
 
       ! Build surface fluxes at cell centers
+      !$omp parallel
       !$omp do schedule(runtime) private(allowedSalt, requiredSalt)
       do iCell = 1, nCells
         tracersSurfaceFlux(index_temperature_flux, iCell) = tracersSurfaceFlux(index_temperature_flux, iCell) &
@@ -461,6 +466,7 @@ contains
         end if
       end do
       !$omp end do
+      !$omp end parallel
       ! assume that snow comes in at 0 C
 
       ! Surface fluxes of water have an associated heat content, but the coupled system does not account for this
@@ -469,6 +475,7 @@ contains
       ! Only include this heat forcing when bulk thickness is turned on
       ! indices on tracerGroup are (iTracer, iLevel, iCell)
       if (bulkThicknessFluxOn) then
+         !$omp parallel
          !$omp do schedule(runtime)
          do iCell = 1, nCells
 
@@ -492,14 +499,17 @@ contains
 
          end do
          !$omp end do
+         !$omp end parallel
       endif ! bulkThicknessFluxOn
 
       ! convert short wave heat flux to a temperature flux
+      !$omp parallel
       !$omp do schedule(runtime)
       do iCell = 1, nCells
          penetrativeTemperatureFlux(iCell) = shortWaveHeatFlux(iCell) * hflux_factor
       end do
       !$omp end do
+      !$omp end parallel
 
    end subroutine ocn_surface_bulk_forcing_active_tracers!}}}
 

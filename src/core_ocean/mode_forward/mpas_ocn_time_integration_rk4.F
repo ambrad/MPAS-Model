@@ -252,6 +252,7 @@ module ocn_time_integration_rk4
          call mpas_pool_get_array(meshPool, 'maxLevelCell', maxLevelCell)
          call mpas_pool_get_array(meshPool, 'maxLevelEdgeTop', maxLevelEdgeTop)
 
+         !$omp parallel
          !$omp do schedule(runtime) private(k)
          do iEdge = 1, nEdges
             do k = 1, maxLevelEdgeTop(iEdge)
@@ -267,6 +268,7 @@ module ocn_time_integration_rk4
             end do
          end do
          !$omp end do
+         !$omp end parallel
 
          call mpas_pool_begin_iteration(tracersPool)
          do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
@@ -277,6 +279,7 @@ module ocn_time_integration_rk4
                call mpas_pool_get_array(tracersPool, trim(groupItr % memberName), tracersNew, 2)
 
                if ( associated(tracersCur) .and. associated(tracersNew) ) then
+                  !$omp parallel
                   !$omp do schedule(runtime) private(k)
                   do iCell = 1, nCells  ! couple tracers to thickness
                      do k = 1, maxLevelCell(iCell)
@@ -284,24 +287,29 @@ module ocn_time_integration_rk4
                      end do
                   end do
                   !$omp end do
+                  !$omp end parallel
                end if
             end if
          end do
 
          if (associated(highFreqThicknessCur)) then
+              !$omp parallel
               !$omp do schedule(runtime)
               do iCell = 1, nCells
                  highFreqThicknessNew(:, iCell) = highFreqThicknessCur(:, iCell)
               end do
               !$omp end do
+              !$omp end parallel
          end if
 
          if (associated(lowFreqDivergenceCur)) then
-              !$omp do schedule(runtime)
+              !$omp parallel
+              !$omp do schedule(runtime) 
               do iCell = 1, nCells
                  lowFreqDivergenceNew(:, iCell) = lowFreqDivergenceCur(:, iCell)
               end do
               !$omp end do
+              !$omp end parallel
          end if
 
          block => block % next
@@ -453,12 +461,14 @@ module ocn_time_integration_rk4
 
               call mpas_pool_get_dimension(block % dimensions, 'nCells', nCells)
 
-              !$omp do schedule(runtime)
+              !$omp parallel
+              !$omp do schedule(runtime) 
               do iCell = 1, nCells
                  highFreqThicknessProvis(:, iCell) = highFreqThicknessCur(:, iCell) + rk_substep_weights(rk_step) &
                     * highFreqThicknessTend(:, iCell)
               end do
               !$omp end do
+              !$omp end parallel
               block => block % next
            end do
 
@@ -675,19 +685,23 @@ module ocn_time_integration_rk4
 
 
          if (config_prescribe_velocity) then
-            !$omp do schedule(runtime)
+            !$omp parallel
+            !$omp do schedule(runtime) 
             do iEdge = 1, nEdges
                normalVelocityNew(:, iEdge) = normalVelocityCur(:, iEdge)
             end do
             !$omp end do
+            !$omp end parallel
          end if
 
          if (config_prescribe_thickness) then
-            !$omp do schedule(runtime)
+            !$omp parallel
+            !$omp do schedule(runtime) 
             do iCell = 1, nCells
                layerThicknessNew(:, iCell) = layerThicknessCur(:, iCell)
             end do
             !$omp end do
+            !$omp end parallel
          end if
 
          ! direct application of tidal boundary condition
@@ -719,11 +733,13 @@ module ocn_time_integration_rk4
          ! ------------------------------------------------------------------
          ! Accumulating various parameterizations of the transport velocity
          ! ------------------------------------------------------------------
-         !$omp do schedule(runtime)
+         !$omp parallel
+         !$omp do schedule(runtime) 
          do iEdge = 1, nEdges
             normalTransportVelocity(:, iEdge) = normalVelocityNew(:, iEdge)
          end do
          !$omp end do
+         !$omp end parallel
 
          ! Compute normalGMBolusVelocity and the tracer transport velocity
          if (config_use_GM) then
@@ -733,11 +749,13 @@ module ocn_time_integration_rk4
          call mpas_threading_barrier()
 
          if (config_use_GM) then
-            !$omp do schedule(runtime)
+            !$omp parallel
+            !$omp do schedule(runtime) 
             do iEdge = 1, nEdges
                normalTransportVelocity(:, iEdge) = normalTransportVelocity(:, iEdge) + normalGMBolusVelocity(:, iEdge)
             end do
             !$omp end do
+            !$omp end parallel
          end if
          ! ------------------------------------------------------------------
          ! End: Accumulating various parameterizations of the transport velocity
@@ -754,7 +772,8 @@ module ocn_time_integration_rk4
                           includeHalos = .true.)
          call mpas_threading_barrier()
 
-         !$omp do schedule(runtime)
+         !$omp parallel
+         !$omp do schedule(runtime) 
          do iCell = 1, nCells
             surfaceVelocity(indexSurfaceVelocityZonal, iCell) = velocityZonal(1, iCell)
             surfaceVelocity(indexSurfaceVelocityMeridional, iCell) = velocityMeridional(1, iCell)
@@ -763,6 +782,7 @@ module ocn_time_integration_rk4
             SSHGradient(indexSSHGradientMeridional, iCell) = gradSSHMeridional(iCell)
          end do
          !$omp end do
+         !$omp end parallel
 
          call ocn_time_average_coupled_accumulate(diagnosticsPool, statePool, forcingPool, 2)
 
@@ -1163,6 +1183,7 @@ module ocn_time_integration_rk4
       call mpas_pool_get_array(diagnosticsPool, 'wettingVelocity', wettingVelocity)
       call mpas_threading_barrier()
 
+      !$omp parallel
       !$omp do schedule(runtime) private(k)
       do iEdge = 1, nEdges
          do k = 1, maxLevelEdgeTop(iEdge)
@@ -1173,7 +1194,6 @@ module ocn_time_integration_rk4
       end do
       !$omp end do
 
-
       !$omp do schedule(runtime) private(k)
       do iCell = 1, nCells
          do k = 1, maxLevelCell(iCell)
@@ -1182,6 +1202,7 @@ module ocn_time_integration_rk4
          end do
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_pool_begin_iteration(tracersPool)
       do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
@@ -1196,6 +1217,7 @@ module ocn_time_integration_rk4
                modifiedGroupName = trim(groupItr % memberName) // 'Tend'
                call mpas_pool_get_array(tracersTendPool, modifiedGroupName, tracersGroupTend)
                if ( associated(tracersGroupProvis) .and. associated(tracersGroupCur) .and. associated(tracersGroupTend) ) then
+                  !$omp parallel
                   !$omp do schedule(runtime) private(k)
                   do iCell = 1, nCells
                      do k = 1, maxLevelCell(iCell)
@@ -1206,34 +1228,41 @@ module ocn_time_integration_rk4
 
                   end do
                   !$omp end do
+                  !$omp end parallel
                end if
             end if
          end if
       end do
 
       if (associated(lowFreqDivergenceCur)) then
-         !$omp do schedule(runtime)
+         !$omp parallel
+         !$omp do schedule(runtime) 
          do iCell = 1, nCells
             lowFreqDivergenceProvis(:, iCell) = lowFreqDivergenceCur(:, iCell) + rkSubstepWeight &
                                               * lowFreqDivergenceTend(:, iCell)
          end do
          !$omp end do
+         !$omp end parallel
       end if
 
       if (config_prescribe_velocity) then
-         !$omp do schedule(runtime)
+         !$omp parallel
+         !$omp do schedule(runtime) 
          do iEdge = 1, nEdges
             normalVelocityProvis(:, iEdge) = normalVelocityCur(:, iEdge)
          end do
          !$omp end do
+         !$omp end parallel
       end if
 
       if (config_prescribe_thickness) then
-         !$omp do schedule(runtime)
+         !$omp parallel
+         !$omp do schedule(runtime) 
          do iCell = 1, nCells
             layerThicknessProvis(:, iCell) = layerThicknessCur(:, iCell)
          end do
          !$omp end do
+         !$omp end parallel
       end if
       call mpas_threading_barrier()
 
@@ -1243,11 +1272,13 @@ module ocn_time_integration_rk4
       ! ------------------------------------------------------------------
       ! Accumulating various parametrizations of the transport velocity
       ! ------------------------------------------------------------------
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) 
       do iEdge = 1, nEdges
          normalTransportVelocity(:, iEdge) = normalVelocityProvis(:, iEdge)
       end do
       !$omp end do
+      !$omp end parallel
 
       ! Compute normalGMBolusVelocity, relativeSlope and RediDiffVertCoef if respective flags are turned on
       if (config_use_GM) then
@@ -1257,11 +1288,13 @@ module ocn_time_integration_rk4
       call mpas_threading_barrier()
 
       if (config_use_GM) then
-         !$omp do schedule(runtime)
+         !$omp parallel
+         !$omp do schedule(runtime) 
          do iEdge = 1, nEdges
             normalTransportVelocity(:, iEdge) = normalTransportVelocity(:, iEdge) + normalGMBolusVelocity(:,iEdge)
          end do
          !$omp end do
+         !$omp end parallel
       end if
       ! ------------------------------------------------------------------
       ! End: Accumulating various parametrizations of the transport velocity
@@ -1327,6 +1360,7 @@ module ocn_time_integration_rk4
 
       call mpas_pool_get_array(meshPool, 'maxLevelCell', maxLevelCell)
 
+      !$omp parallel
       !$omp do schedule(runtime) private(k)
       do iCell = 1, nCells
          do k = 1, maxLevelCell(iCell)
@@ -1335,12 +1369,13 @@ module ocn_time_integration_rk4
       end do
       !$omp end do
 
-      !$omp do schedule(runtime)
+      !$omp do schedule(runtime) 
       do iEdge = 1, nEdges
          normalVelocityNew(:, iEdge) = normalVelocityNew(:, iEdge) + rkWeight * normalVelocityTend(:, iEdge)
          normalVelocityNew(:, iEdge) = normalVelocityNew(:, iEdge) * (1.0_RKIND - wettingVelocity(:, iEdge))
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_pool_begin_iteration(tracersPool)
       do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
@@ -1354,6 +1389,7 @@ module ocn_time_integration_rk4
                modifiedGroupName = trim(groupItr % memberName) // 'Tend'
                call mpas_pool_get_array(tracersTendPool, modifiedGroupName, tracersGroupTend)
                if ( associated(tracersGroupNew) .and. associated(tracersGroupTend) ) then
+                  !$omp parallel
                   !$omp do schedule(runtime) private(k)
                   do iCell = 1, nCells
                      do k = 1, maxLevelCell(iCell)
@@ -1362,25 +1398,30 @@ module ocn_time_integration_rk4
                      end do
                   end do
                   !$omp end do
+                  !$omp end parallel
                end if
             end if
          end if
       end do
 
       if (associated(highFreqThicknessNew)) then
-         !$omp do schedule(runtime)
+         !$omp parallel
+         !$omp do schedule(runtime) 
          do iCell = 1, nCells
             highFreqThicknessNew(:, iCell) = highFreqThicknessNew(:, iCell) + rkWeight * highFreqThicknessTend(:, iCell)
          end do
          !$omp end do
+         !$omp end parallel
       end if
 
       if (associated(lowFreqDivergenceNew)) then
-         !$omp do schedule(runtime)
+         !$omp parallel
+         !$omp do schedule(runtime) 
          do iCell = 1, nCells
             lowFreqDivergenceNew(:, iCell) = lowFreqDivergenceNew(:, iCell) + rkWeight * lowFreqDivergenceTend(:, iCell)
          end do
          !$omp end do
+         !$omp end parallel
       end if
 
    end subroutine ocn_time_integrator_rk4_accumulate_update!}}}
@@ -1441,6 +1482,7 @@ module ocn_time_integration_rk4
          if ( groupItr % memberType == MPAS_POOL_FIELD ) then
             call mpas_pool_get_array(tracersPool, groupItr % memberName, tracersGroupNew, 2)
             if ( associated(tracersGroupNew) ) then
+               !$omp parallel
                !$omp do schedule(runtime) private(k)
                do iCell = 1, nCells
                  do k = 1, maxLevelCell(iCell)
@@ -1448,6 +1490,7 @@ module ocn_time_integration_rk4
                  end do
                end do
                !$omp end do
+               !$omp end parallel
             end if
          end if
       end do

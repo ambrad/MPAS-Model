@@ -148,7 +148,9 @@ contains
 
       allocate( qArr(nVertLevels) )
 
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) &
+      !$omp private(cell1, cell2, invLength, k, qArr, j, eoe, edgeWeight, workVorticity)
       do iEdge = 1, nEdges
          cell1 = cellsOnEdge(1,iEdge)
          cell2 = cellsOnEdge(2,iEdge)
@@ -179,6 +181,7 @@ contains
 
       end do
       !$omp end do
+      !$omp end parallel
 
       deallocate( qArr )
 

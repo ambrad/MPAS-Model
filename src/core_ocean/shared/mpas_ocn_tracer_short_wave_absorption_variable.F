@@ -156,7 +156,8 @@ contains
 
       nCells = nCellsArray( 3 )
 
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) private(depth, cloudRatio, k, depLev)
       do iCell = 1, nCells
         depth = 0.0_RKIND
         cloudRatio = min(1.0_RKIND, 1.0_RKIND - penetrativeTemperatureFlux(iCell)/(hflux_factor*(1.0E-15_RKIND + &
@@ -188,6 +189,7 @@ contains
 
       end do
       !$omp end do
+      !$omp end parallel
 
       deallocate(weights)
 

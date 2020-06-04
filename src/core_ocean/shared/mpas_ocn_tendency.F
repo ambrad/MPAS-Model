@@ -143,6 +143,7 @@ contains
       !
       ! height tendency: start accumulating tendency terms
       !
+      !$omp parallel
       !$omp do schedule(runtime)
       do iCell = 1, nCells
          tend_layerThickness(:, iCell) = 0.0_RKIND
@@ -150,6 +151,7 @@ contains
          surfaceThicknessFluxRunoff(iCell) = 0.0_RKIND
       end do
       !$omp end do
+      !$omp end parallel
 
       if(config_disable_thick_all_tend) return
 
@@ -302,6 +304,7 @@ contains
       !
       ! velocity tendency: start accumulating tendency terms
       !
+      !$omp parallel
       !$omp do schedule(runtime)
       do iEdge = 1, nEdges
          tend_normalVelocity(:, iEdge) = 0.0_RKIND
@@ -314,6 +317,7 @@ contains
          surfaceStressMagnitude(iCell) = 0.0_RKIND
       end do
       !$omp end do
+      !$omp end parallel
 
       if(config_disable_vel_all_tend) return
 
@@ -400,11 +404,13 @@ contains
       !
       ! velocity tendency: zero if drying
       !
+      !$omp parallel
       !$omp do schedule(runtime)
       do iEdge = 1, nEdges
          tend_normalVelocity(:, iEdge) = tend_normalVelocity(:, iEdge) * (1.0_RKIND - wettingVelocity(:, iEdge))
       end do
       !$omp end do
+      !$omp end parallel
 
       !
       ! velocity tendency: vertical mixing d/dz( nu_v du/dz))
@@ -611,6 +617,7 @@ contains
       !
       ! transport velocity for the tracer.
       !
+      !$omp parallel
       !$omp do schedule(runtime) private(k)
       do iEdge = 1, nEdges
          do k = 1, nVertLevels
@@ -618,6 +625,7 @@ contains
          end do
       end do
       !$omp end do
+      !$omp end parallel
 
       !
       ! begin iterate over tracer categories
@@ -675,31 +683,32 @@ contains
                !
                ! initialize tracer surface flux and tendency to zero.
                !
+               !$omp parallel
                !$omp do schedule(runtime)
                do iCell = 1, nCells
                  tracerGroupTend(:,:, iCell) = 0.0_RKIND
                  tracerGroupSurfaceFlux(:, iCell) = 0.0_RKIND
                end do
                !$omp end do
+               !$omp end parallel
 
                !
                ! fill components of surface tracer flux
                !
                if (config_use_tracerGroup_surface_bulk_forcing) then
+                  !$omp parallel
                   !$omp do schedule(runtime)
                   do iCell = 1, nCells
                     tracerGroupSurfaceFluxRunoff(:, iCell) = 0.0_RKIND
                     tracerGroupSurfaceFluxRemoved(:, iCell) = 0.0_RKIND
                   end do
                   !$omp end do
+                  !$omp end parallel
 
                   call ocn_surface_bulk_forcing_tracers(meshPool, groupItr % memberName, forcingPool, tracerGroup, &
                                                         tracerGroupSurfaceFlux, tracerGroupSurfaceFluxRunoff, &
                                                         tracerGroupSurfaceFluxRemoved, dt, layerThickness, err)
                end if
-
-
-               !$omp master
 
                !
                ! compute ecosystem source-sink tendencies and net surface fluxes
@@ -746,10 +755,6 @@ contains
                      nTracerGroup, nCellsSolve, zMid, indexTemperature, indexSalinity, tracerGroupSurfaceFlux, err)
                endif
 
-               !$omp end master
-               call mpas_threading_barrier()
-
-               !
                ! ocean surface restoring
                !
                  if (config_use_tracerGroup_surface_restoring) then
@@ -884,11 +889,13 @@ contains
                !
                if (config_compute_active_tracer_budgets) then
                   if ( trim(groupItr % memberName) == 'activeTracers' ) then
+                     !$omp parallel
                      !$omp do schedule(runtime)
                      do iCell = 1, nCells
                         activeTracerSurfaceFluxTendency(:,:,iCell) = tracerGroupTend(:,:,iCell)
                      end do
                      !$omp end do
+                     !$omp end parallel
                   endif
                endif
 
@@ -902,6 +909,7 @@ contains
                if ( trim(groupItr % memberName) == 'activeTracers' ) then
 
                   if (config_compute_active_tracer_budgets) then
+                     !$omp parallel
                      !$omp do schedule(runtime)
                      do iCell = 1, nCells
                         activeTracerSurfaceFluxTendency(:,:,iCell) = tracerGroupTend(:,:,iCell) &
@@ -909,18 +917,21 @@ contains
                         temperatureShortWaveTendency(:,iCell) = tracerGroupTend(indexTemperature,:,iCell)
                      end do
                      !$omp end do
+                     !$omp end parallel
                   endif
 
                   call ocn_tracer_short_wave_absorption_tend(meshPool, swForcingPool, forcingPool, indexTemperature, &
                            layerThickness, penetrativeTemperatureFlux, penetrativeTemperatureFluxOBL, tracerGroupTend, err)
 
                   if (config_compute_active_tracer_budgets) then
+                     !$omp parallel
                      !$omp do schedule(runtime)
                      do iCell = 1, nCells
                         temperatureShortWaveTendency(:,iCell) = tracerGroupTend(indexTemperature,:,iCell) - &
                                         temperatureShortWaveTendency(:,iCell)
                      end do
                      !$omp end do
+                     !$omp end parallel
                   endif
                endif
 
@@ -933,19 +944,23 @@ contains
                   if (.not. config_cvmix_kpp_nonlocal_with_implicit_mix) then
                      if( trim(groupItr % memberName) == 'activeTracers' ) then
                         if (config_compute_active_tracer_budgets) then
+                           !$omp parallel
                            !$omp do schedule(runtime)
                            do iCell = 1, nCells
                               activeTracerNonLocalTendency(:,:,iCell) = tracerGroupTend(:,:,iCell)
                            end do
                            !$omp end do
+                           !$omp end parallel
                         endif
                         call ocn_tracer_nonlocalflux_tend(meshPool, vertNonLocalFlux, nonLocalSurfaceTracerFlux, tracerGroupTend, err)
                         if (config_compute_active_tracer_budgets) then
+                           !$omp parallel
                            !$omp do schedule(runtime)
                            do iCell = 1, nCells
                               activeTracerNonLocalTendency(:,:,iCell) = tracerGroupTend(:,:,iCell)-activeTracerNonLocalTendency(:,:,iCell)
                            end do
                            !$omp end do
+                           !$omp end parallel
                         endif
                      else
                         call ocn_tracer_nonlocalflux_tend(meshPool, vertNonLocalFlux, tracerGroupSurfaceFlux, tracerGroupTend, err)
@@ -1051,7 +1066,9 @@ contains
 
       allocate(div_hu(nVertLevels))
 
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) &
+      !$omp private(div_hu, div_hu_btr, invAreaCell, i, iEdge, k, flux, totalThickness)
       do iCell = 1, nCells
         tend_lowFreqDivergence(:, iCell) = 0.0_RKIND
         tend_highFreqThickness(:, iCell) = 0.0_RKIND
@@ -1084,6 +1101,7 @@ contains
         end do
       end do
       !$omp end do
+      !$omp end parallel
 
       deallocate(div_hu)
 

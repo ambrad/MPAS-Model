@@ -185,6 +185,7 @@ contains
       call mpas_pool_get_array(diagnosticsPool, 'topDrag', topDrag)
       call mpas_pool_get_array(diagnosticsPool, 'topDragMagnitude', topDragMagnitude)
 
+      !$omp parallel
       !$omp do schedule(runtime)
       do iEdge = 1, nEdges
         surfaceStress(iEdge) = surfaceStress(iEdge) + topDrag(iEdge)
@@ -197,6 +198,7 @@ contains
         surfaceStressMagnitude(iCell) = surfaceStressMagnitude(iCell) + topDragMagnitude(iCell)
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_timer_stop("top_drag")
 
@@ -264,11 +266,13 @@ contains
       call mpas_pool_get_array(forcingPool, 'landIceFreshwaterFlux', landIceFreshwaterFlux)
 
       ! Build surface fluxes at cell centers
+      !$omp parallel
       !$omp do schedule(runtime)
       do iCell = 1, nCells
         surfaceThicknessFlux(iCell) = surfaceThicknessFlux(iCell) + landIceFreshwaterFlux(iCell) / rho_sw
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_timer_stop("land_ice_thick")
 
@@ -332,11 +336,13 @@ contains
       call mpas_pool_get_array(forcingPool, 'landIceHeatFlux', landIceHeatFlux)
 
       ! add to surface fluxes at cell centers
+      !$omp parallel
       !$omp do schedule(runtime)
       do iCell = 1, nCells
         tracersSurfaceFlux(1, iCell) = tracersSurfaceFlux(1, iCell) + landIceHeatFlux(iCell)/(rho_sw*cp_sw)
       end do
       !$omp end do
+      !$omp end parallel
 
    end subroutine ocn_surface_land_ice_fluxes_active_tracers!}}}
 
@@ -491,7 +497,8 @@ contains
       nCells = nCellsArray( size(nCellsArray) )
 
       if(isomipOn) then
-         !$omp do schedule(runtime)
+         !$omp parallel
+         !$omp do schedule(runtime) private(freshwaterFlux, heatFlux)
          do iCell = 1, nCells
             if (landIceMask(iCell) == 0) cycle
 
@@ -521,6 +528,7 @@ contains
 
          end do
          !$omp end do
+         !$omp end parallel
       end if
 
       if(jenkinsOn .or. hollandJenkinsOn) then
@@ -783,7 +791,8 @@ contains
     err = 0
     Tlatent = latent_heat_fusion_mks/cp_sw
 
-    !$omp do schedule(runtime)
+    !$omp parallel
+    !$omp do schedule(runtime) private(T0, dTf_dS, transferVelocityRatio, a, b, c)
     do iCell = 1, nCells
       if (mask(iCell) == 0) cycle
 
@@ -827,6 +836,7 @@ contains
       outIceHeatFlux(iCell) = -cp_land_ice*outFreshwaterFlux(iCell)*outInterfaceTemperature(iCell)
     end do
     !$omp end do
+    !$omp end parallel
 
   !--------------------------------------------------------------------
 
@@ -928,7 +938,9 @@ contains
 
     err = 0
     cpRatio = cp_land_ice/cp_sw
-    !$omp do schedule(runtime) reduction(+:err)
+    !$omp parallel
+    !$omp do schedule(runtime) reduction(+:err) &
+    !$omp private(T0, dTf_dS, transferVelocityRatio, Tlatent, eta, TlatentStar, a, b, c)
     do iCell = 1, nCells
       if (mask(iCell) == 0) cycle
 
@@ -970,6 +982,7 @@ contains
       outIceHeatFlux(iCell) = -cp_land_ice*outFreshwaterFlux(iCell)*iceTemperature(iCell)
     end do
     !$omp end do
+    !$omp end parallel
 
   !--------------------------------------------------------------------
 

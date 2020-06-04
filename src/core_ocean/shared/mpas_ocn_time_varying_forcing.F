@@ -439,7 +439,8 @@ contains
 
     ramp = tanh((2.0_RKIND*daysSinceStartOfSim)/config_forcing_ramp)
 
-    !$omp do schedule(runtime) private(iCell, windStressCoefficient)
+    !$omp parallel
+    !$omp do schedule(runtime) private(windStressCoefficient)
     do iCell = 1, nCells
 
        windSpeedU(iCell) = ramp*windSpeedU(iCell)
@@ -457,6 +458,7 @@ contains
 
     enddo
     !$omp end do
+    !$omp end parallel
 
   end subroutine post_atmospheric_forcing!}}}
 

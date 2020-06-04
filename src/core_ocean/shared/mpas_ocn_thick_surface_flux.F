@@ -133,6 +133,7 @@ contains
 
       nCells = nCellsArray( 1 )
 
+      !$omp parallel
       !$omp do schedule(runtime) private(remainingFlux, remainingFluxRunoff, k)
       do iCell = 1, nCells
         remainingFlux = 1.0_RKIND
@@ -155,6 +156,7 @@ contains
         end if
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_timer_stop("thick surface flux")
 

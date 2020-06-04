@@ -158,19 +158,23 @@ contains
 
       nEdges = nEdgesArray( 2 )
 
+      !$omp parallel
       !$omp do schedule(runtime)
       do iEdge = 1, nEdges
          vertViscTopOfEdge(:, iEdge) = 0.0_RKIND
       end do
       !$omp end do
+      !$omp end parallel
 
       nCells = nCellsArray( 2 )
 
+      !$omp parallel
       !$omp do schedule(runtime)
       do iCell = 1, nCells
          vertDiffTopOfCell(:, iCell) = 0.0_RKIND
       end do
       !$omp end do
+      !$omp end parallel
 
       call ocn_vmix_coefs_cvmix_build(meshPool, statePool, forcingPool, diagnosticsPool, err1, timeLevel)
       call ocn_vmix_coefs_redi_build(meshPool, statePool, diagnosticsPool, err2, timeLevel)
@@ -270,7 +274,9 @@ contains
       allocate(A(nVertLevels),B(nVertLevels),C(nVertLevels),velTemp(nVertLevels))
       A(1)=0.0_RKIND
 
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) &
+      !$omp private(N, cell1, cell2, edgeThicknessTotal, k, A, B, C, velTemp)
       do iEdge = 1, nEdges
         N = maxLevelEdgeTop(iEdge)
         if (N .gt. 0) then
@@ -326,6 +332,7 @@ contains
         end if
       end do
       !$omp end do
+      !$omp end parallel
 
       deallocate(A,B,C,velTemp)
 
@@ -421,7 +428,8 @@ contains
       allocate(A(nVertLevels),B(nVertLevels),C(nVertLevels),velTemp(nVertLevels))
       A(1)=0.0_RKIND
 
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) private(N, cell1, cell2, A, B, C, velTemp)
       do iEdge = 1, nEdges
         N = maxLevelEdgeTop(iEdge)
         if (N .gt. 0) then
@@ -468,6 +476,7 @@ contains
         end if
       end do
       !$omp end do
+      !$omp end parallel
 
       deallocate(A,B,C,velTemp)
 
@@ -563,7 +572,8 @@ contains
       nCells = nCellsArray( 1 )
 
       call mpas_timer_start('vmix tracers tend imp loop', .false.)
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) private(N, A, B, C, rhs, tracersTemp)
       do iCell = 1, nCells
          ! Compute A(k), B(k), C(k) for tracers
          N = maxLevelCell(iCell)
@@ -602,6 +612,7 @@ contains
          tracers(:,N+1:nVertLevels,iCell) = -1e34
       end do
       !$omp end do
+      !$omp end parallel
       call mpas_timer_stop('vmix tracers tend imp loop')
 
       deallocate(A, B, C, tracersTemp, rhs)
@@ -709,6 +720,7 @@ contains
 
          nEdges = nEdgesArray( 1 )
          call mpas_timer_start('CVMix avg', .false.)
+         !$omp parallel
          !$omp do schedule(runtime) private(cell1, cell2, k)
          do iEdge=1,nEdges
             vertViscTopOfEdge(:, iEdge) = 0.0_RKIND
@@ -719,6 +731,7 @@ contains
             end do
          end do
          !$omp end do
+         !$omp end parallel
          call mpas_timer_stop('CVMix avg')
       endif
 
@@ -750,11 +763,13 @@ contains
             ! store tracers
             if (trim(groupItr % memberName) == 'activeTracers') then
                if (config_compute_active_tracer_budgets) then
+                  !$omp parallel
                   !$omp do schedule(runtime)
                   do iCell = 1, nCells
                      activeTracerVertMixTendency(:,:,iCell)=tracersGroup(:,:,iCell)
                   end do
                   !$omp end do
+                  !$omp end parallel
                endif
             endif
 
@@ -776,12 +791,14 @@ contains
             ! difference tracers to compute influence of vertical mixing and divide by dt
             if (trim(groupItr % memberName) == 'activeTracers') then
                if (config_compute_active_tracer_budgets) then
+                  !$omp parallel
                   !$omp do schedule(runtime)
                   do iCell = 1, nCells
                      activeTracerVertMixTendency(:,:,iCell) = &
                         (tracersGroup(:,:,iCell) - activeTracerVertMixTendency(:,:,iCell)) / dt
                   end do
                   !$omp end do
+                  !$omp end parallel
                endif
             endif
 

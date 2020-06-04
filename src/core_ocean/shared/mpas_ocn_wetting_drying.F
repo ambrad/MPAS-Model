@@ -273,13 +273,13 @@ contains
      call mpas_pool_get_array(meshPool, 'maxLevelEdgeTop', maxLevelEdgeTop)
      call mpas_pool_get_array(meshPool, 'maxLevelEdgeBot', maxLevelEdgeBot)
 
-
+     !$omp parallel
      !$omp do schedule(runtime)
      do iEdge = 1, nEdges
        wettingVelocity(:, iEdge) = 0.0_RKIND
      end do
      !$omp end do
-     call mpas_threading_barrier()
+     !$omp end parallel
 
      ! ensure cells stay wet by selectively damping cells with a damping tendency to make sure tendency doesn't dry cells
 
@@ -287,7 +287,8 @@ contains
                                              normalTransportVelocity, rkSubstepWeight, wettingVelocity, err)
 
      ! prevent drying from happening with selective wettingVelocity
-     !$omp do schedule(runtime)
+     !$omp parallel
+     !$omp do schedule(runtime) private(k)
      do iEdge = 1, nEdges
        do k = 1, maxLevelEdgeBot(iEdge)
          if (abs(normalTransportVelocity(k,iEdge) + wettingVelocity(k,iEdge)) < eps)  then
@@ -307,7 +308,7 @@ contains
        end do
      end do
      !$omp end do
-     call mpas_threading_barrier()
+     !$omp end parallel
 
    end subroutine ocn_prevent_drying_rk4 !}}}
 
@@ -411,6 +412,7 @@ contains
       call mpas_threading_barrier()
 
       ! need predicted transport velocity to limit drying flux
+      !$omp parallel
       !$omp do schedule(runtime) private(invAreaCell, i, iEdge, k)
       do iCell = 1, nCells
         invAreaCell = 1.0_RKIND / areaCell(iCell)
@@ -454,8 +456,7 @@ contains
         end do
       end do
       !$omp end do
-
-      call mpas_threading_barrier()
+      !$omp end parallel
 
    end subroutine ocn_wetting_drying_wettingVelocity !}}}
 

@@ -199,11 +199,13 @@ contains
 
       nCells = nCellsSolve
 
+      !$omp parallel
       !$omp do schedule(runtime)
       do iCell = 1, nCells
          vertDiffTopOfCell(:, iCell) = vertDiffTopOfCell(:, iCell) + RediKappa(iCell) * k33(:, iCell)
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_timer_stop('tracer redi coef')
 

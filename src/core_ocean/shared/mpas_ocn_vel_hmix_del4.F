@@ -186,7 +186,9 @@ contains
       nEdges = nEdgesArray( 3 )
 
       !Compute delsq_u
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) &
+      !$omp private(cell1, cell2, vertex1, vertex2, invDcEdge, invDvEdge, k)
       do iEdge = 1, nEdges
          delsq_u(:, iEdge) = 0.0_RKIND
          cell1 = cellsOnEdge(1,iEdge)
@@ -205,11 +207,13 @@ contains
          end do
       end do
       !$omp end do
+      !$omp end parallel
 
       nVertices = nVerticesArray( 2 )
 
       ! Compute delsq_relativeVorticity
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) private(invAreaTri1, i, iEdge, k)
       do iVertex = 1, nVertices
          delsq_relativeVorticity(:, iVertex) = 0.0_RKIND
          invAreaTri1 = 1.0_RKIND / areaTriangle(iVertex)
@@ -222,11 +226,13 @@ contains
          end do
       end do
       !$omp end do
+      !$omp end parallel
 
       nCells = nCellsArray( 2 )
 
       ! Compute delsq_divergence
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) private(invAreaCell1, i, iEdge, k)
       do iCell = 1, nCells
          delsq_divergence(:, iCell) = 0.0_RKIND
          invAreaCell1 = 1.0_RKIND / areaCell(iCell)
@@ -239,12 +245,15 @@ contains
          end do
       end do
       !$omp end do
+      !$omp end parallel
 
       nEdges = nEdgesArray( 1 )
 
       ! Compute - \kappa \nabla^4 u
       ! as  \nabla div(\nabla^2 u) + k \times \nabla ( k \cross curl(\nabla^2 u) )
-      !$omp do schedule(runtime)
+      !$omp parallel
+      !$omp do schedule(runtime) &
+      !$omp private(cell1, cell2, vertex1, vertex2, invDcEdge, invDvEdge, r_tmp, k, u_diffusion)
       do iEdge = 1, nEdges
          cell1 = cellsOnEdge(1,iEdge)
          cell2 = cellsOnEdge(2,iEdge)
@@ -263,6 +272,7 @@ contains
          end do
       end do
       !$omp end do
+      !$omp end parallel
 
       call mpas_deallocate_scratch_field(delsq_uField, .true.)
       call mpas_deallocate_scratch_field(delsq_divergenceField, .true.)

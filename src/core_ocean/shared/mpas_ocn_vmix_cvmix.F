@@ -288,6 +288,7 @@ contains
 
       nCells = nCellsArray( size(nCellsArray) )
 
+      !$omp parallel
       !$omp do schedule(runtime)
       do iCell = 1, nCells
          vertViscTopOfCell(:, iCell) = 0.0_RKIND
@@ -295,6 +296,7 @@ contains
          vertNonLocalFlux(:, :, iCell) = 0.0_RKIND
       end do
       !$omp end do
+      !$omp end parallel
 
       nCells = nCellsArray( 3 )
 
@@ -302,6 +304,7 @@ contains
       ! start by adding the mininum background values to the viscocity/diffusivity arrays
       !
       if (cvmixBackgroundOn) then
+         !$omp parallel
          !$omp do schedule(runtime)
          do iCell = 1, nCells
             do k = 1, nVertLevelsP1
@@ -310,6 +313,7 @@ contains
             end do
          end do
          !$omp end do
+         !$omp end parallel
       endif
 
       !
@@ -353,7 +357,16 @@ contains
 
       call mpas_timer_start('cvmix cell loop', .false.)
       do kpp_stage = 1,2
-      !$omp do schedule(runtime)
+      ! TODO, mdt: determine where the openmp data race is coming from in this loop
+      !!$omp parallel
+      !!$omp do schedule(runtime) &
+      !!$omp private(iCell, invAreaCell, k, RiSmoothed, RiTemp, BVFSmoothed, nsmooth, &
+      !!$omp         langmuirNumber, langmuirEnhancementFactor, bulkRichardsonNumberStop, &
+      !!$omp         bulkRichardsonFlag, topIndex, kIndexOBL, deltaVelocitySquared, sigma, &
+      !!$omp         OBLDepths, interfaceForcings, surfaceAverageIndex, sfc_layer_depth, kav, &
+      !!$omp         i, iEdge, factor, normalVelocitySum, NormalVelocityAv, &
+      !!$omp         delU2, potentialDensitySum, blTemp) &
+      !!$omp firstprivate(cvmix_variables, Nsqr_iface, turbulentScalarVelocityScale)
       do iCell = 1, nCells
          invAreaCell = 1.0_RKIND / areaCell(iCell)
 
@@ -745,11 +758,13 @@ contains
 
  endif ! kpp stage 2 convection calc
       end do  ! do iCell=1,mesh%nCells
-      !$omp end do
+      !!$omp end do
+      !!$omp end parallel
 
       if (kpp_stage == 1 .and. config_cvmix_use_BLD_smoothing) then ! smooth boundary layer
          nCells = nCellsArray(2)
 
+         !$omp parallel
          !$omp do schedule(runtime) private(nEdges, areaSum, edgeCount, iEdge, iNeighbor)
          do iCell=1,nCells
             nEdges = nEdgesOnCell(iCell)
@@ -777,6 +792,7 @@ contains
              boundaryLayerDepth(iCell) = boundaryLayerDepthSmooth(iCell)
           enddo
          !$omp end do
+         !$omp end parallel
 
        endif !stage 1 BLD smoothing
       end do ! kpp_stage
