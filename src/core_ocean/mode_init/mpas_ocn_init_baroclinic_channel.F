@@ -204,6 +204,9 @@ contains
         call ocn_mark_north_boundary(meshPool, yMaxGlobal, dcEdgeMinGlobal, iErr)
         call ocn_mark_south_boundary(meshPool, yMinGlobal, dcEdgeMinGlobal, iErr)
 
+        call mpas_log_write('amb> hi')
+        if (associated(debugTracers)) call mpas_log_write('amb> debugTracers associated')
+
         ! Set refBottomDepth and refZMid
         do k = 1, nVertLevels
             refBottomDepth(k) = config_baroclinic_channel_bottom_depth * interfaceLocations(k+1)
@@ -216,14 +219,6 @@ contains
         do iCell = 1, nCellsSolve
            ! Determine cutoff location for large sin wave
            yOffset = perturbationWidth * sin (6.0_RKIND * pii * (xCell(iCell) - xMinGlobal) / (xMaxGlobal - xMinGlobal))
-
-           ! Set debug tracer
-           if ( associated(debugTracers) ) then
-              idx = index_tracer1
-              do k = 1, nVertLevels
-                 debugTracers(idx, k, iCell) = 1.0_RKIND
-              enddo
-           end if
 
            ! Set stratification based on northern half of domain temperature
            if ( associated(activeTracers) ) then
@@ -265,6 +260,18 @@ contains
               ! Set salinity
               idx = index_salinity
               activeTracers(idx, :, iCell) = config_baroclinic_channel_salinity
+           end if
+
+           ! Set debug tracer
+           if ( associated(debugTracers) ) then
+              do k = 1, nVertLevels
+                 debugTracers(1, k, iCell) = activeTracers(index_temperature,k,iCell)
+                 debugTracers(2, k, iCell) = &
+                      sin(2*3.141592653589793d0*xCell(iCell)/(xMax - xMin))* &
+                      sin(2*3.141592653589793d0*yCell(iCell)/(yMax - yMin))* &
+                      cos(2*3.141592653589793d0*refZMid(k)/refZMid(nVertLevels))
+                 debugTracers(3, k, iCell) = activeTracers(index_temperature,k,iCell)
+              enddo
            end if
 
            ! Set layerThickness and restingThickness
