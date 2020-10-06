@@ -41,6 +41,9 @@ module ocn_time_integration_rk4
 
    use ocn_effective_density_in_land_ice
 
+   use amb
+   !use act
+
    implicit none
    private
    save
@@ -374,6 +377,8 @@ module ocn_time_integration_rk4
         if (config_disable_thick_all_tend .and. config_disable_vel_all_tend .and. config_disable_tr_all_tend) then
           exit ! don't compute in loop meant to update velocity, thickness, and tracers
         end if
+
+        !call act_velocity(meshPool, daysSinceStartOfSim, rk_substep_weights(rk_step), normalVelocityNew)
 
         ! Update halos for diagnostic variables.
         if (config_use_cvmix_kpp) then

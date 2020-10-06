@@ -208,9 +208,9 @@ pgi-llnl:
 
 ifort:
 	( $(MAKE) all \
-	"FC_PARALLEL = mpif90" \
-	"CC_PARALLEL = mpicc" \
-	"CXX_PARALLEL = mpicxx" \
+	"FC_PARALLEL = mpiifort" \
+	"CC_PARALLEL = mpiicc" \
+	"CXX_PARALLEL = mpiicpc" \
 	"FC_SERIAL = ifort" \
 	"CC_SERIAL = icc" \
 	"CXX_SERIAL = icpc" \
