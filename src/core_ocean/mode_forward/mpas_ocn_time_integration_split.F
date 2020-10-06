@@ -42,6 +42,8 @@ module ocn_time_integration_split
 
    use ocn_effective_density_in_land_ice
 
+   use amb
+
    implicit none
    private
    save
@@ -403,6 +405,8 @@ module ocn_time_integration_split
       n_bcl_iter(config_n_ts_iter) = config_n_bcl_iter_end
 
       do split_explicit_step = 1, config_n_ts_iter
+         call amb_set_split_explicit_step(split_explicit_step, config_n_ts_iter)
+         call amb_set_layerThickness0(layerThicknessCur)
 
          if (config_disable_thick_all_tend .and. config_disable_vel_all_tend .and. config_disable_tr_all_tend) then
            exit ! don't compute in loop meant to update velocity, thickness, and tracers
@@ -1621,6 +1625,8 @@ module ocn_time_integration_split
 
             call mpas_pool_get_array(tracersTendPool, 'activeTracersTend', activeTracersTend)
 
+            call mpas_pool_get_array(meshPool, 'areaCell', areaCell)
+
             nCells = nCellsPtr
             nEdges = nEdgesPtr
 
@@ -1805,6 +1811,14 @@ module ocn_time_integration_split
                         end do
                         !$omp end do
                         !$omp end parallel
+
+                        if (trim(groupItr%memberName) == 'debugTracers') then
+                           if (amb_use()) &
+                              call amb_update(maxLevelCell, nCells, dt, tracersGroupCur, &
+                                   tracersGroupTend, layerThicknessNew, tracersGroupNew)
+                           call amb_check_tracers(maxLevelCell, nCells, areaCell, &
+                                layerThicknessNew, tracersGroupNew)
+                        end if
 
                         ! limit salinity in separate loop
                         if ( trim(groupItr % memberName) == 'activeTracers' ) then
