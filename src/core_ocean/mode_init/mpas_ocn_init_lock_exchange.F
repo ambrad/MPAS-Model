@@ -247,9 +247,15 @@ contains
 
             ! Set debugging tracer
             if ( associated(debugTracers) ) then
-               do k = 1, nVertLevels
-                  debugTracers(index_tracer1, k, iCell) = 1.0_RKIND
-               enddo
+              do k = 1, nVertLevels
+                 debugTracers(1, k, iCell) = activeTracers(index_temperature,k,iCell)
+                 debugTracers(2, k, iCell) = 1.1 + &
+                      sin(2*3.141592653589793d0*yCell(iCell)/(yMaxGlobal - yMinGlobal))* &
+                      cos(2*3.141592653589793d0* &
+                          0.5d0*(interfaceLocations(k) + interfaceLocations(k+1))/ &
+                                interfaceLocations(nVertLevels))
+                 debugTracers(3, k, iCell) = 42.0d0
+              end do
             end if
 
             ! Set bottomDepth

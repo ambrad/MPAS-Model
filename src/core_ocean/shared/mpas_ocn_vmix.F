@@ -32,6 +32,8 @@ module ocn_vmix
    use ocn_vmix_cvmix
    use ocn_vmix_coefs_redi
 
+   use amb
+
    implicit none
    private
    save
@@ -1040,6 +1042,10 @@ contains
 
       character (len=StrKIND) :: modifiedGroupName
       integer, pointer :: indexTempFlux, indexSaltFlux, nVertLevels
+
+      !amb
+      real (kind=RKIND) :: dtuse
+
       err = 0
 
       call mpas_timer_start('vmix imp')
@@ -1135,6 +1141,14 @@ contains
       do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
 
          if ( groupItr % memberType == MPAS_POOL_FIELD ) then
+            dtuse = dt
+            if (amb_use()) then
+               if (trim(groupItr % memberName) /= 'activeTracers') then
+                  if (.not. amb_is_tracer_step()) cycle
+                  dtuse = amb_get_supercycle()*dt
+               end if
+            end if
+
             call mpas_pool_get_array(tracersPool, groupItr % memberName, tracersGroup, timeLevel)
             ! store tracers
             if (trim(groupItr % memberName) == 'activeTracers') then
@@ -1159,19 +1173,19 @@ contains
                           tracerGroupSurfaceFlux)
                endif
 
-               call ocn_tracer_vmix_tend_implicit(meshPool, dt, vertDiffTopOfCell, layerThickness, tracersGroup, &
+               call ocn_tracer_vmix_tend_implicit(meshPool, dtuse, vertDiffTopOfCell, layerThickness, tracersGroup, &
                         vertNonLocalFlux, tracerGroupSurfaceFlux,  &
                         config_cvmix_kpp_nonlocal_with_implicit_mix, err)
             end if
 
-            ! difference tracers to compute influence of vertical mixing and divide by dt
+            ! difference tracers to compute influence of vertical mixing and divide by dtuse
             if (trim(groupItr % memberName) == 'activeTracers') then
                if (config_compute_active_tracer_budgets) then
                   !$omp parallel
                   !$omp do schedule(runtime)
                   do iCell = 1, nCells
                      activeTracerVertMixTendency(:,:,iCell) = &
-                        (tracersGroup(:,:,iCell) - activeTracerVertMixTendency(:,:,iCell)) / dt
+                        (tracersGroup(:,:,iCell) - activeTracerVertMixTendency(:,:,iCell)) / dtuse
                   end do
                   !$omp end do
                   !$omp end parallel

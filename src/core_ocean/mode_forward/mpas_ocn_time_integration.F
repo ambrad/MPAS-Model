@@ -35,6 +35,8 @@ module ocn_time_integration
    use ocn_time_integration_rk4
    use ocn_time_integration_split
 
+   use amb
+
    implicit none
    private
    save
@@ -104,6 +106,7 @@ module ocn_time_integration
       character (len=StrKIND), pointer :: simulationStartTime
       type (MPAS_Time_type) :: xtime_timeType, simulationStartTime_timeType
 
+      call amb_set_timestep(domain%dminfo%comm)
 
       if (rk4On) then
          call ocn_time_integrator_rk4(domain, dt)
