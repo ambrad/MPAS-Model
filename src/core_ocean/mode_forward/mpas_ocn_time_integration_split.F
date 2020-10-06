@@ -42,6 +42,8 @@ module ocn_time_integration_split
 
    use ocn_effective_density_in_land_ice
 
+   use amb
+
    implicit none
    private
    save
@@ -231,6 +233,9 @@ module ocn_time_integration_split
       integer :: temp_mask
       real (kind=RKIND) :: tracer2_value, lat
 
+      !amb
+      logical :: updated_tracers
+
       call mpas_timer_start("se timestep")
 
       call mpas_pool_get_config(domain % configs, 'config_n_bcl_iter_beg', config_n_bcl_iter_beg)
@@ -403,6 +408,10 @@ module ocn_time_integration_split
       n_bcl_iter(config_n_ts_iter) = config_n_bcl_iter_end
 
       do split_explicit_step = 1, config_n_ts_iter
+         if (amb_use()) then
+            call amb_set_split_explicit_step(split_explicit_step, config_n_ts_iter)
+            call amb_set_layerThickness0(layerThicknessCur)
+         end if
 
          if (config_disable_thick_all_tend .and. config_disable_vel_all_tend .and. config_disable_tr_all_tend) then
            exit ! don't compute in loop meant to update velocity, thickness, and tracers
@@ -1621,6 +1630,8 @@ module ocn_time_integration_split
 
             call mpas_pool_get_array(tracersTendPool, 'activeTracersTend', activeTracersTend)
 
+            call mpas_pool_get_array(meshPool, 'areaCell', areaCell)
+
             nCells = nCellsPtr
             nEdges = nEdgesPtr
 
@@ -1795,16 +1806,27 @@ module ocn_time_integration_split
                         modifiedGroupName = trim(groupItr % memberName) // 'Tend'
                         call mpas_pool_get_array(tracersTendPool, modifiedGroupName, tracersGroupTend)
 
-                        !$omp parallel
-                        !$omp do schedule(runtime) private(k)
-                        do iCell = 1, nCells
-                           do k = 1, maxLevelCell(iCell)
-                              tracersGroupNew(:,k,iCell) = (tracersGroupCur(:,k,iCell) * layerThicknessCur(k,iCell) + dt &
-                                                         * tracersGroupTend(:,k,iCell) ) / layerThicknessNew(k,iCell)
+                        updated_tracers = .false.
+                        if (amb_use()) then
+                           if (trim(groupItr % memberName) /= 'activeTracers') then
+                              call amb_update(maxLevelCell, nCells, dt, tracersGroupCur, &
+                                   tracersGroupTend, layerThicknessNew, tracersGroupNew)
+                              updated_tracers = .true.
+                           end if
+                           !call amb_check_tracers(maxLevelCell, nCells, areaCell, layerThicknessNew, tracersGroupNew)
+                        end if
+                        if (.not. updated_tracers) then
+                           !$omp parallel
+                           !$omp do schedule(runtime) private(k)
+                           do iCell = 1, nCells
+                              do k = 1, maxLevelCell(iCell)
+                                 tracersGroupNew(:,k,iCell) = (tracersGroupCur(:,k,iCell) * layerThicknessCur(k,iCell) + dt &
+                                      * tracersGroupTend(:,k,iCell) ) / layerThicknessNew(k,iCell)
+                              end do
                            end do
-                        end do
-                        !$omp end do
-                        !$omp end parallel
+                           !$omp end do
+                           !$omp end parallel
+                        end if
 
                         ! limit salinity in separate loop
                         if ( trim(groupItr % memberName) == 'activeTracers' ) then
