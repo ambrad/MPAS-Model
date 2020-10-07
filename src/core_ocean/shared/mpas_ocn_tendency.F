@@ -62,6 +62,8 @@ module ocn_tendency
    use ocn_wetting_drying
    use ocn_vel_tidal_potential
 
+   use amb
+
    implicit none
    private
    save
@@ -813,6 +815,8 @@ contains
                ! Monotonoic Advection, or standard advection
                ! Tendency for tracer budget is stored within the tracer adv
                ! routine
+                if (amb_amroot() .and. mod(amb_get_timestep()-1,500) == 0) &
+                  print *,'amb> mpas_ocn_tendency.F ts',amb_get_timestep(),trim(groupItr%memberName)
                call ocn_tracer_advection_tend(tracerGroup, normalThicknessFlux, vertAleTransportTop, layerThickness, &
                                               dt, meshPool, scratchPool, diagnosticsPool, tracerGroupTend, &
                                               trim(groupItr % memberName))

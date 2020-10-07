@@ -34,6 +34,8 @@ module ocn_tracer_advection_mono
 
    use ocn_constants
 
+   use amb
+
    implicit none
    private
    save
