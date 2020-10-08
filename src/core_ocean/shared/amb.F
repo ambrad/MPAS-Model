@@ -12,7 +12,7 @@ module amb
   integer :: mpirank
   logical :: amroot
 
-  integer, parameter :: supercycle = 2
+  integer, parameter :: supercycle = 5
   integer :: timestep
 
 contains

@@ -489,6 +489,9 @@ contains
       !               units: m^{2} s^{-1}
       real (kind=RKIND), dimension(:,:), allocatable :: normalThicknessFlux
 
+      !amb
+      real(RKIND) :: dtuse
+
       !
       ! set time level of optional argument is present
       !
@@ -588,8 +591,17 @@ contains
             !
             modifiedConfigName = 'config_use_' // trim(groupItr % memberName)
             call mpas_pool_get_config(ocnConfigs, modifiedConfigName, config_use_tracerGroup)
-
+            
             if ( config_use_tracerGroup ) then
+               if (amb_amroot() .and. mod(amb_get_timestep()-1,500) == 0) &
+                  print *, 'amb> mpas_ocn_tendency.F ts', amb_get_timestep(), &
+                  trim(groupItr%memberName)
+               dtuse = dt
+               if (trim(groupItr%memberName) /= 'activeTracers') then
+                  if (mod(amb_get_timestep()-1, amb_get_supercycle()) /= 0) cycle
+                  dtuse = amb_get_supercycle()*dt
+               end if
+
                modifiedConfigName = 'config_use_' // trim(groupItr % memberName) // '_surface_bulk_forcing'
                call mpas_pool_get_config(ocnConfigs, modifiedConfigName, config_use_tracerGroup_surface_bulk_forcing)
                modifiedConfigName = 'config_use_' // trim(groupItr % memberName) // '_surface_restoring'
@@ -656,7 +668,7 @@ contains
 
                   call ocn_surface_bulk_forcing_tracers(meshPool, groupItr % memberName, forcingPool, tracerGroup, &
                                                         tracerGroupSurfaceFlux, tracerGroupSurfaceFluxRunoff, &
-                                                        tracerGroupSurfaceFluxRemoved, dt, layerThickness, err)
+                                                        tracerGroupSurfaceFluxRemoved, dtuse, layerThickness, err)
                end if
 
                !
@@ -815,10 +827,8 @@ contains
                ! Monotonoic Advection, or standard advection
                ! Tendency for tracer budget is stored within the tracer adv
                ! routine
-                if (amb_amroot() .and. mod(amb_get_timestep()-1,500) == 0) &
-                  print *,'amb> mpas_ocn_tendency.F ts',amb_get_timestep(),trim(groupItr%memberName)
                call ocn_tracer_advection_tend(tracerGroup, normalThicknessFlux, vertAleTransportTop, layerThickness, &
-                                              dt, meshPool, scratchPool, diagnosticsPool, tracerGroupTend, &
+                                              dtuse, meshPool, scratchPool, diagnosticsPool, tracerGroupTend, &
                                               trim(groupItr % memberName))
 
                !
@@ -839,7 +849,7 @@ contains
                  endif
                endif
                call ocn_tracer_hmix_tend(meshPool, scratchPool, layerThicknessEdge, layerThickness, zMid, tracerGroup, &
-                                         RediKappa, slopeTriadUp, slopeTriadDown, dt, isActiveTracer, &
+                                         RediKappa, slopeTriadUp, slopeTriadDown, dtuse, isActiveTracer, &
                                          RediKappaSfcTaper, RediKappaScaling, rediLimiterCount, tracerGroupTend, err)
 
                if(trim(groupItr % memberName)=='activeTracers') then
