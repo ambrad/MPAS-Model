@@ -67,7 +67,7 @@ OBJS = mpas_ocn_init_routines.o \
 	   mpas_ocn_time_varying_forcing.o \
 	   mpas_ocn_wetting_drying.o \
 	   mpas_ocn_vel_tidal_potential.o \
-	   amb.o
+	   amb.o act.o
 
 all: $(OBJS)
 

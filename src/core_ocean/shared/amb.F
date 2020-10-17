@@ -35,7 +35,7 @@ contains
 
   subroutine amb_set_timestep(ts)
     integer, intent(in) :: ts
-    call init()
+    call amb_init()
     timestep = ts
   end subroutine amb_set_timestep
 
@@ -65,7 +65,7 @@ contains
     r = mpirank
   end function amb_get_rank
 
-  subroutine init()
+  subroutine amb_init()
     integer :: err
     character (len=255) :: amb_sc
 
@@ -83,7 +83,7 @@ contains
     end if
 
     if (amroot) print '(a,l,a,i2)', 'amb> init use', use, ' supercycle', supercycle
-  end subroutine init
+  end subroutine amb_init
 
   subroutine amb_set_layerThickness0(layerThickness)
     real(8), intent(in) :: layerThickness(:,:)
