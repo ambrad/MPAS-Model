@@ -22,6 +22,7 @@ contains
 
     err = 0
     call amb_init()
+    if (amb_amroot()) print *,'amb> act_init'
   end subroutine act_init
 
   subroutine act_init_validate(cfgpl, pkgpl, iocontext, err)

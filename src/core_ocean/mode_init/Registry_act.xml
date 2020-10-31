@@ -1,0 +1,10 @@
+<nml_record name="act" mode="init" configuration="cvmix_WSwSBF">
+	<nml_option name="config_act_temperature" type="real" default_value="15.0" units="deg C"
+			        description="Temperature of the ocean."
+			        possible_values="Any real number"
+		          />
+	<nml_option name="config_act_salinity" type="real" default_value="35.0" units="PSU"
+			        description="Salinity of the ocean."
+			        possible_values="Any real number"
+		          />
+</nml_record>

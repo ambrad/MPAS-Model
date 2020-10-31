@@ -1,0 +1,26 @@
+<regression_suite name="act">
+	<test name="QU240 ACT" core="ocean" configuration="convergence_global" resolution="QU240" test="act">
+		<script name="run.py"/>
+	</test>
+	<test name="QU210 ACT" core="ocean" configuration="convergence_global" resolution="QU210" test="act">
+		<script name="run.py"/>
+	</test>
+	<test name="QU180 ACT" core="ocean" configuration="convergence_global" resolution="QU180" test="act">
+		<script name="run.py"/>
+	</test>
+	<test name="QU150 ACT" core="ocean" configuration="convergence_global" resolution="QU150" test="act">
+		<script name="run.py"/>
+	</test>
+	<test name="QU120 ACT" core="ocean" configuration="convergence_global" resolution="QU120" test="act">
+		<script name="run.py"/>
+	</test>
+	<test name="QU90 ACT" core="ocean" configuration="convergence_global" resolution="QU90" test="act">
+		<script name="run.py"/>
+	</test>
+	<test name="QU60 ACT" core="ocean" configuration="convergence_global" resolution="QU60" test="act">
+		<script name="run.py"/>
+	</test>
+	<test name="analysis ACT" core="ocean" configuration="convergence_global" resolution="analysis" test="act">
+		<script name="run.py"/>
+	</test>
+</regression_suite>

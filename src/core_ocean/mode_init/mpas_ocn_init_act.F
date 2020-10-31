@@ -1,4 +1,4 @@
-module mpas_ocn_init_act_test
+module ocn_init_act
   use mpas_kind_types
   use mpas_io_units
   use mpas_derived_types
@@ -13,7 +13,7 @@ module mpas_ocn_init_act_test
 
 contains
 
-  subroutine ocn_init_setup_act_test(domain, iErr)
+  subroutine ocn_init_setup_act(domain, iErr)
     type (domain_type), intent(inout) :: domain
     integer, intent(out) :: iErr
 
@@ -25,9 +25,9 @@ contains
     if (config_init_configuration /= trim('act')) return
 
     call act_init(domain, iErr)
-  end subroutine ocn_init_setup_act_test
+  end subroutine ocn_init_setup_act
 
-  subroutine ocn_init_validate_act_test(configPool, packagePool, iocontext, iErr)
+  subroutine ocn_init_validate_act(configPool, packagePool, iocontext, iErr)
     type (mpas_pool_type), intent(inout) :: configPool
     type (mpas_pool_type), intent(inout) :: packagePool
     type (mpas_io_context_type), intent(inout) :: iocontext
@@ -41,6 +41,6 @@ contains
     if (config_init_configuration /= trim('act')) return
 
     call act_init_validate(configPool, packagePool, iocontext, iErr)
-  end subroutine ocn_init_validate_act_test
+  end subroutine ocn_init_validate_act
 
-end module mpas_ocn_init_act_test
+end module ocn_init_act

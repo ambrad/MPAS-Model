@@ -40,6 +40,7 @@ module ocn_init_mode
 
    use ocn_init_spherical_utils
    use ocn_init_cosine_bell
+   use ocn_init_act
    !use ocn_init_TEMPLATE
    use ocn_init_baroclinic_channel
    use ocn_init_lock_exchange
@@ -288,6 +289,7 @@ module ocn_init_mode
       call ocn_init_setup_hurricane(domain, ierr)
       call ocn_init_setup_tidal_boundary(domain, ierr)
       call ocn_init_setup_cosine_bell(domain, ierr)
+      call ocn_init_setup_act(domain, ierr)
       !call ocn_init_setup_TEMPLATE(domain, ierr)
 
       call mpas_log_write( ' Completed setup of: ' // trim(config_init_configuration))
@@ -398,6 +400,8 @@ module ocn_init_mode
       call ocn_init_validate_tidal_boundary(configPool, packagePool, iocontext, iErr=err_tmp)
       iErr = ior(iErr, err_tmp)
       call ocn_init_validate_cosine_bell(configPool, packagePool, iocontext, iErr=err_tmp)
+      iErr = ior(iErr, err_tmp)
+      call ocn_init_validate_act(configPool, packagePool, iocontext, iErr=err_tmp)
       iErr = ior(iErr, err_tmp)
       ! call ocn_init_validate_TEMPLATE(configPool, packagePool, iocontext, iErr=err_tmp)
       ! iErr = ior(iErr, err_tmp)
