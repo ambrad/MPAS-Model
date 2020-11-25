@@ -63,6 +63,7 @@ module ocn_tendency
    use ocn_vel_tidal_potential
 
    use amb
+   use act, only: act_vel_tend
 
    implicit none
    private
@@ -301,6 +302,8 @@ contains
       end do
       !$omp end do
       !$omp end parallel
+
+      call act_vel_tend(meshPool, normalVelocity, tend_normalVelocity)
 
       if(config_disable_vel_all_tend) return
 

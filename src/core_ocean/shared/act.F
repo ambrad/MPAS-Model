@@ -1,4 +1,7 @@
 module act
+  ! amb_sc   if defined, integer supercycle value
+  ! amb_act  if defined, any non-0 value
+
   use mpas_kind_types
   use mpas_io_units
   use mpas_derived_types
@@ -10,8 +13,17 @@ module act
   use amb, only: amb_init, amb_amroot, amb_get_rank
 
   implicit none
+  private
+
+  public :: act_vel_tend
 
   real (RKIND), parameter :: pi = 3.141592653589793d0
+
+  type :: act_t
+     integer :: state = 0
+  end type act_t
+
+  type (act_t) :: a
 
 contains
 
@@ -139,7 +151,28 @@ contains
     err = 0
 
     call mpas_pool_get_config(cfgpl, 'config_vert_levels', config_vert_levels)
-    config_vert_levels = 3 
+    config_vert_levels = 3
   end subroutine act_init_validate
+
+  subroutine act_vel_tend(meshPool, normalVelocity, tend_normalVelocity)
+    type (mpas_pool_type), intent(in) :: meshPool
+    real(RKIND), intent(in) :: normalVelocity(:,:)
+    real(RKIND), intent(inout) :: tend_normalVelocity(:,:)
+
+    integer :: err, val
+    character (len=255) :: key
+
+    if (a%state == 0) then
+       a%state = 1
+       call get_environment_variable("amb_act", key, status=err)
+       if (err /= 1) then
+          read(key, '(i)', iostat=err) val
+          if (val /= 0) a%state = 2
+       end if
+    end if
+
+    if (a%state /= 2) return
+    if (amb_amroot()) print *,'amb> here'
+  end subroutine act_vel_tend
 
 end module act
