@@ -234,7 +234,7 @@ module ocn_time_integration_split
       real (kind=RKIND) :: tracer2_value, lat
 
       !amb
-      logical :: updated_tracers
+      logical :: updated_tracers, is_active, exchange
 
       call mpas_timer_start("se timestep")
 
@@ -1579,9 +1579,10 @@ module ocn_time_integration_split
          do while ( mpas_pool_get_next_member(tracersTendPool, groupItr) )
             if ( groupItr % memberType == MPAS_POOL_FIELD ) then
                ! Only compute tendencies for active tracers if activeTracersOnly flag is true.
-               if ( .not.activeTracersOnly .or. trim(groupItr % memberName)=='activeTracersTend') then
-                  call mpas_dmpar_field_halo_exch(domain, groupItr % memberName)
-               end if
+               is_active = trim(groupItr % memberName)=='activeTracersTend'
+               exchange = .not. activeTracersOnly .or. is_active
+               if (amb_use()) exchange = exchange .and. (is_active .or. amb_is_tracer_step())
+               if (exchange) call mpas_dmpar_field_halo_exch(domain, groupItr % memberName)
             end if
          end do
          call mpas_timer_stop("se halo tracers")

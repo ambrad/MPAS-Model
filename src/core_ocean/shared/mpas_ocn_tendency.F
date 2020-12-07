@@ -608,7 +608,7 @@ contains
                      if (poolidx /= 1) print *, 'amb> passive must come after active'
                      call amb_accum(normalThicknessFlux, vertAleTransportTop)
                   else                     
-                     if (mod(amb_get_timestep(), amb_get_supercycle()) /= 0) cycle
+                     if (.not. amb_is_tracer_step()) cycle
                      dtuse = amb_get_supercycle()*dt
                      call amb_fill(normalThicknessFlux, vertAleTransportTopCopy)
                      vertAleTransportTop => vertAleTransportTopCopy

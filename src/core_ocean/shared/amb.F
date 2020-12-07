@@ -54,6 +54,11 @@ contains
     sc = supercycle
   end function amb_get_supercycle
 
+  function amb_is_tracer_step() result(b)
+    logical :: b
+    b = mod(timestep, supercycle) == 0
+  end function amb_is_tracer_step
+
   function amb_amroot() result(ar)
     logical :: ar
     ar = amroot
