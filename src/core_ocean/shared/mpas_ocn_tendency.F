@@ -304,7 +304,6 @@ contains
       !$omp end parallel
 
       call act_vel_tend(meshPool, normalVelocity, tend_normalVelocity)
-
       if(config_disable_vel_all_tend) return
 
       call mpas_timer_start("ocn_tend_vel")
@@ -495,7 +494,8 @@ contains
       !amb
       real(RKIND) :: dtuse
       integer :: poolidx
-      real (kind=RKIND), dimension(:,:), allocatable :: vertAleTransportTopCopy, layerThicknessCopy
+      logical :: active_tracers
+      real (kind=RKIND), dimension(:,:), allocatable, target :: vertAleTransportTopCopy
 
       !
       ! set time level of optional argument is present
@@ -570,8 +570,9 @@ contains
       call mpas_timer_start("ocn_tend_tracer")
 
       allocate(normalThicknessFlux(nVertLevels, nEdges+1))
-      allocate(vertAleTransportTopCopy(size(vertAleTransportTop,1), size(vertAleTransportTop,2)))
-      allocate(layerThicknessCopy(size(layerThickness,1), size(layerThickness,2)))
+      if (amb_use()) then
+         allocate(vertAleTransportTopCopy(size(vertAleTransportTop,1), size(vertAleTransportTop,2)))
+      end if
 
       !
       ! transport velocity for the tracer.
@@ -601,21 +602,18 @@ contains
             call mpas_pool_get_config(ocnConfigs, modifiedConfigName, config_use_tracerGroup)
             
             if ( config_use_tracerGroup ) then
-               if (amb_amroot() .and. mod(amb_get_timestep()-1,100) == 0) &
-                  print *, 'amb> mpas_ocn_tendency.F ts', amb_get_timestep(), &
-                           trim(groupItr%memberName), amb_get_supercycle()
                dtuse = dt
-               vertAleTransportTopCopy(:,:) = vertAleTransportTop(:,:)
-               layerThicknessCopy(:,:) = layerThickness(:,:)
                if (amb_use()) then
                   poolidx = poolidx + 1
-                  if (trim(groupItr%memberName) /= 'activeTracers') then
-                     if (mod(amb_get_timestep(), amb_get_supercycle()) /= 0) cycle
+                  active_tracers = trim(groupItr%memberName) == 'activeTracers'
+                  if (active_tracers) then
+                     if (poolidx /= 1) print *, 'amb> passive must come after active'
+                     call amb_accum(normalThicknessFlux, vertAleTransportTop)
+                  else                     
+                     if (.not. amb_is_tracer_step()) cycle
                      dtuse = amb_get_supercycle()*dt
                      call amb_fill(normalThicknessFlux, vertAleTransportTopCopy)
-                  else
-                     if (poolidx /= 1) print *, 'amb> passive must come after active'
-                     call amb_accum(normalThicknessFlux, vertAleTransportTopCopy)
+                     vertAleTransportTop => vertAleTransportTopCopy
                   end if
                end if
 
@@ -844,7 +842,7 @@ contains
                ! Monotonoic Advection, or standard advection
                ! Tendency for tracer budget is stored within the tracer adv
                ! routine
-               call ocn_tracer_advection_tend(tracerGroup, normalThicknessFlux, vertAleTransportTopCopy, layerThicknessCopy, &
+               call ocn_tracer_advection_tend(tracerGroup, normalThicknessFlux, vertAleTransportTop, layerThickness, &
                                               dtuse, meshPool, scratchPool, diagnosticsPool, tracerGroupTend, &
                                               trim(groupItr % memberName))
 
@@ -978,7 +976,10 @@ contains
          end if
       end do
 
-      deallocate(normalThicknessFlux, vertAleTransportTopCopy)
+      deallocate(normalThicknessFlux)
+      if (amb_use()) then
+         deallocate(vertAleTransportTopCopy)
+      end if
 
       call mpas_timer_stop("ocn_tend_tracer")
 

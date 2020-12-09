@@ -84,8 +84,6 @@ module ocn_forward_mode
    use ocn_constants
    use ocn_config
 
-   use amb
-
    implicit none
    private
 
@@ -550,7 +548,6 @@ module ocn_forward_mode
 
          itimestep = itimestep + 1
          call mpas_advance_clock(domain % clock)
-         call amb_set_timestep(itimestep)
 
          currTime = mpas_get_clock_time(domain % clock, MPAS_NOW, ierr)
          call mpas_get_time(curr_time=currTime, dateTimeString=timeStamp, ierr=ierr)

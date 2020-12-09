@@ -33,10 +33,9 @@ contains
     u = use
   end function amb_use
 
-  subroutine amb_set_timestep(ts)
-    integer, intent(in) :: ts
+  subroutine amb_set_timestep()
     call amb_init()
-    timestep = ts
+    timestep = timestep + 1
   end subroutine amb_set_timestep
 
   subroutine amb_set_split_explicit_step(split_explicit_step_in, n_ts_iter_in)
@@ -55,6 +54,11 @@ contains
     sc = supercycle
   end function amb_get_supercycle
 
+  function amb_is_tracer_step() result(b)
+    logical :: b
+    b = mod(timestep, supercycle) == 0
+  end function amb_is_tracer_step
+
   function amb_amroot() result(ar)
     logical :: ar
     ar = amroot
@@ -71,6 +75,9 @@ contains
 
     if (.not. first) return
     first = .false.
+
+    timestep = 0
+
     call mpi_comm_rank(MPI_COMM_WORLD, mpirank, err)
     amroot = mpirank == 0
 
@@ -78,8 +85,8 @@ contains
     supercycle = 1
     call get_environment_variable("amb_sc", amb_sc, status=err)
     if (err /= 1) then
-       use = .true.
        read(amb_sc, '(i)', iostat=err) supercycle
+       use = supercycle > 1
     end if
 
     if (amroot) print '(a,l,a,i2)', 'amb> init use', use, ' supercycle', supercycle
