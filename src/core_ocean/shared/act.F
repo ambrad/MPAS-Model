@@ -108,9 +108,15 @@ contains
              activeTracers(index_temperature, :, iCell) = 15.0d0
              activeTracers(index_salinity, :, iCell) = 35.0d0
           endif
-
+          
           if (associated(debugTracers)) then
-             debugTracers(:,:,iCell) = 0.0_RKIND
+             do k = 1, nVertLevels
+                debugTracers(1, k, iCell) = cos(2*pi*refZMid(k)/refZMid(nVertLevels))* &
+                     xyztrig(lonCell(iCell), latCell(iCell))
+                debugTracers(3, k, iCell) = cos(2*pi*refZMid(k)/refZMid(nVertLevels))* &
+                     cosine_bells(lonCell(iCell), latCell(iCell))
+                debugTracers(3, k, iCell) = 42.0d0
+             end do
           endif
 
           do k = 1, nVertLevels
@@ -174,5 +180,76 @@ contains
     if (a%state /= 2) return
     if (amb_amroot()) print *,'amb> here'
   end subroutine act_vel_tend
+
+  subroutine lonlat2xyz(lon, lat, x, y, z)
+    real(RKIND), intent(in) :: lon, lat
+    real(RKIND), intent(out) :: x, y, z
+    real(RKIND) :: sinl, cosl
+    sinl = sin(lat)
+    cosl = cos(lat)
+    x = cos(lon)*cosl
+    y = sin(lon)*cosl
+    z = sinl
+  end subroutine lonlat2xyz
+
+  subroutine xyz2lonlat(x, y, z, lon, lat)
+    real(RKIND), intent(in) :: x, y, z
+    real(RKIND), intent(out) :: lon, lat
+    real(RKIND) :: r
+    lon = atan2(y, x);
+    r = sqrt(x*x + y*y + z*z)
+    lat = asin(z/r);
+  end subroutine xyz2lonlat
+
+  function great_circle_dist_xyz(xA, yA, zA, xB, yB, zB) result(dist)
+    real(RKIND), intent(in) :: xA, yA, zA, xB, yB, zB
+    real(RKIND) :: dist, cp1, cp2, cp3, cpnorm, dotprod
+    cp1 = yA*zB - yB*zA
+    cp2 = xB*zA - xA*zB
+    cp3 = xA*yB - xB*yA
+    cpnorm = sqrt(cp1*cp1 + cp2*cp2 + cp3*cp3)
+    dotprod = xA*xB + yA*yB + zA*zB
+    dist = atan2(cpnorm, dotprod)
+  end function great_circle_dist_xyz
+
+  function great_circle_dist_ll(lon1, lat1, lon2, lat2, radius) result(dist)
+    real(RKIND), intent(in) :: lon1, lat1, lon2, lat2, radius
+    real(RKIND) :: dist, xA, yA, zA, xB, yB, zB, cp1, cp2, cp3, cpnorm, dotprod
+    call lonlat2xyz(lon1, lat1, xA, yA, zA)
+    call lonlat2xyz(lon2, lat2, xB, yB, zB)
+    dist = radius*great_circle_dist_xyz(xA, yA, zA, xB, yB, zB)
+  end function great_circle_dist_ll
+
+  function cosine_bell(ri, r) result(cb)
+    real(RKIND), intent(in) :: ri, r
+    real(RKIND) :: cb
+    real(RKIND), parameter :: hmax = 1._RKIND
+    cb = 0.5_RKIND*hmax*(1 + cos(pi*ri/r))
+  end function cosine_bell
+
+  function cosine_bells(lon, lat) result (cbs)
+    real(RKIND), intent(in) :: lon, lat
+    real(RKIND), parameter :: r = 0.5_RKIND, b = 0.1_RKIND, c = 0.9_RKIND, &
+         lon1 = 5*(pi/6), lat1 = 0, lon2 = -5*(pi/6), lat2 = 0
+    real(RKIND) :: cbs, x, y, z, x1, y1, z1, x2, y2, z2, r1, r2
+    call lonlat2xyz(lon, lat, x, y, z)
+    call lonlat2xyz(lon1, lat1, x1, y1, z1)
+    r1 = great_circle_dist_xyz(x, y, z, x1, y1, z1)
+    cbs = 0
+    if (r1 < r) then
+       cbs = cosine_bell(r1, r)
+    else
+       call lonlat2xyz(lon2, lat2, x2, y2, z2)
+       r2 = great_circle_dist_xyz(x, y, z, x2, y2, z2)
+       if (r2 < r) cbs = cosine_bell(r2, r)
+    end if
+  end function cosine_bells
+
+  function xyztrig(lon, lat) result (f)
+    real(RKIND), intent(in) :: lon, lat
+    real(RKIND) :: f, x, y, z
+    call lonlat2xyz(lon, lat, x, y, z)
+    f = 0.5_RKIND*(1 + sin(pi*x)*sin(pi*y)*sin(pi*z))
+  end function xyztrig
 
 end module act
