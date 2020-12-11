@@ -211,7 +211,7 @@ contains
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_tend_vel(tendPool, statePool, forcingPool, diagnosticsPool, meshPool, scratchPool, timeLevelIn, dt)!{{{
+   subroutine ocn_tend_vel(tendPool, statePool, forcingPool, diagnosticsPool, meshPool, scratchPool, timeLevelIn, dt, dt_substep)!{{{
       implicit none
 
       type (mpas_pool_type), intent(inout) :: tendPool !< Input/Output: Tendency structure
@@ -219,7 +219,7 @@ contains
       type (mpas_pool_type), intent(inout) :: forcingPool !< Input: Forcing information
       type (mpas_pool_type), intent(in) :: diagnosticsPool !< Input: Diagnostic information
       type (mpas_pool_type), intent(in) :: meshPool !< Input: Mesh information
-      real (kind=RKIND), intent(in) :: dt
+      real (kind=RKIND), intent(in) :: dt, dt_substep
       type (mpas_pool_type), intent(inout) :: scratchPool !< Input: Scratch structure
       integer, intent(in), optional :: timeLevelIn !< Input: Time level for state fields
 
@@ -243,6 +243,9 @@ contains
       integer :: err, iEdge, iCell, k
       integer, pointer :: indexTemperature, indexSalinity, nEdges, nCells
       integer, dimension(:), pointer :: maxLevelCell
+
+      !amb
+      real (kind=RKIND), pointer :: daysSinceStartOfSim
 
       if (present(timeLevelIn)) then
          timeLevel = timeLevelIn
@@ -303,7 +306,8 @@ contains
       !$omp end do
       !$omp end parallel
 
-      call act_vel_tend(meshPool, normalVelocity, tend_normalVelocity)
+      call mpas_pool_get_array(diagnosticsPool, 'daysSinceStartOfSim',daysSinceStartOfSim)
+      call act_vel_tend(meshPool, daysSinceStartOfSim, dt_substep, normalVelocity, tend_normalVelocity)
       if(config_disable_vel_all_tend) return
 
       call mpas_timer_start("ocn_tend_vel")

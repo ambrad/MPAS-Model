@@ -24,7 +24,7 @@ contains
          config_init_configuration)
     if (config_init_configuration /= trim('act')) return
 
-    call act_init(domain, iErr)
+    call act_init_setup(domain, iErr)
   end subroutine ocn_init_setup_act
 
   subroutine ocn_init_validate_act(configPool, packagePool, iocontext, iErr)

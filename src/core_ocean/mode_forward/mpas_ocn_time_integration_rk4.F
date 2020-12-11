@@ -861,7 +861,7 @@ module ocn_time_integration_rk4
             vertAleTransportTop, err)
       endif
 
-      call ocn_tend_vel(tendPool, provisStatePool, forcingPool, diagnosticsPool, meshPool, scratchPool, 1, dt)
+      call ocn_tend_vel(tendPool, provisStatePool, forcingPool, diagnosticsPool, meshPool, scratchPool, 1, dt, rkSubstepWeight)
 
    end subroutine ocn_time_integrator_rk4_compute_vel_tends!}}}
 
@@ -996,6 +996,7 @@ module ocn_time_integration_rk4
 
    end subroutine ocn_time_integrator_rk4_compute_tracer_tends!}}}
 
+#if 0
    subroutine ocn_time_integrator_rk4_compute_tends(block, dt, rkWeight, err)!{{{
       type (block_type), intent(in) :: block
       real (kind=RKIND), intent(in) :: dt
@@ -1079,6 +1080,7 @@ module ocn_time_integration_rk4
                            scratchPool, dt, activeTracersOnlyIn=.false., timeLevelIn=1)
 
    end subroutine ocn_time_integrator_rk4_compute_tends!}}}
+#endif
 
    subroutine ocn_time_integrator_rk4_diagnostic_update(block, dt, rkSubstepWeight, err)!{{{
       type (block_type), intent(in) :: block

@@ -10,24 +10,25 @@ module act
   use mpas_stream_manager
   use mpas_dmpar
 
-  use amb, only: amb_init, amb_amroot, amb_get_rank
+  use amb, only: amb_init, amb_amroot
 
   implicit none
   private
 
-  public :: act_vel_tend
+  public :: act_init_setup, act_init_validate, act_vel_tend
 
-  real (RKIND), parameter :: pi = 3.141592653589793d0
+  real(RKIND), parameter :: pi = 3.141592653589793d0
 
   type :: act_t
      integer :: state = 0
+     real(RKIND) :: sim_time
   end type act_t
 
   type (act_t) :: a
 
 contains
 
-  subroutine act_init(domain, err)
+  subroutine act_init_setup(domain, err)
     type (domain_type), intent(inout) :: domain
     integer, intent(out) :: err
 
@@ -50,8 +51,8 @@ contains
     real (kind=RKIND) :: temp, velocity, temperature, salinity
     
     err = 0
-    call amb_init()
-    if (amb_amroot()) print *,'amb> act_init'
+    call act_init()
+    if (amb_amroot()) print *,'amb> act_init_setup'
 
     block_ptr => domain % blocklist
     do while(associated(block_ptr))
@@ -113,7 +114,7 @@ contains
              do k = 1, nVertLevels
                 debugTracers(1, k, iCell) = cos(2*pi*refZMid(k)/refZMid(nVertLevels))* &
                      xyztrig(lonCell(iCell), latCell(iCell))
-                debugTracers(3, k, iCell) = cos(2*pi*refZMid(k)/refZMid(nVertLevels))* &
+                debugTracers(2, k, iCell) = cos(2*pi*refZMid(k)/refZMid(nVertLevels))* &
                      cosine_bells(lonCell(iCell), latCell(iCell))
                 debugTracers(3, k, iCell) = 42.0d0
              end do
@@ -124,28 +125,26 @@ contains
              restingThickness(k, iCell) = layerThickness(k, iCell)
           end do
 
-          fCell(iCell) = 0.0_RKIND*omega*sin(latCell(iCell)) ! 0 Coriolis
+          fCell(iCell) = 0.0_RKIND ! 0 Coriolis
           bottomDepth(iCell) = 100.0_RKIND
           maxLevelCell(iCell) = nVertLevels
        end do
 
        do iEdge = 1, nEdgesSolve
-          fEdge(iEdge) = 0.0_RKIND*omega*sin(latEdge(iEdge))
+          fEdge(iEdge) = 0.0_RKIND
        end do
 
        do iVertex=1, nVerticesSolve
-          fVertex(iVertex) = 0.0_RKIND*omega*sin(latVertex(iVertex))
+          fVertex(iVertex) = 0.0_RKIND
        end do
 
        do iEdge = 1,nEdgesSolve
-          velocity = 2.0*3.14159265*sphere_radius*cos(latEdge(iEdge)) / &
-               (86400.0_RKIND*12.0d0)
-          normalVelocity(:,iEdge) = velocity*cos(angleEdge(iEdge))
+          normalVelocity(:,iEdge) = 0
        enddo
 
        block_ptr => block_ptr % next
     end do
-  end subroutine act_init
+  end subroutine act_init_setup
 
   subroutine act_init_validate(cfgpl, pkgpl, iocontext, err)
     type (mpas_pool_type), intent(inout) :: cfgpl, pkgpl
@@ -160,14 +159,33 @@ contains
     config_vert_levels = 3
   end subroutine act_init_validate
 
-  subroutine act_vel_tend(meshPool, normalVelocity, tend_normalVelocity)
+  subroutine act_vel_tend(meshPool, days_since_start, dt, normalVelocity, tend_normalVelocity)
     type (mpas_pool_type), intent(in) :: meshPool
-    real(RKIND), intent(in) :: normalVelocity(:,:)
+    real(RKIND), intent(in) :: days_since_start, dt, normalVelocity(:,:)
     real(RKIND), intent(inout) :: tend_normalVelocity(:,:)
 
-    integer :: err, val
-    character (len=255) :: key
+    real(RKIND), dimension(:), pointer :: latEdge, lonEdge
+    integer, pointer :: nEdges
+    integer :: i
 
+    call act_init()
+    if (a%state /= 2) return
+
+    if (amb_amroot()) print *,'amb> days', days_since_start, 'dt', dt
+    call mpas_pool_get_dimension(meshPool, 'nEdges', nEdges)
+    call mpas_pool_get_array(meshPool, 'latEdge', latEdge)
+    call mpas_pool_get_array(meshPool, 'lonEdge', lonEdge)
+    do i = 1, nEdges
+       tend_normalVelocity(:,i) = 0
+    end do
+  end subroutine act_vel_tend
+
+  subroutine act_init()
+    character (len=255) :: key
+    integer :: err, val
+
+    if (a%state == 2) return
+    call amb_init()
     if (a%state == 0) then
        a%state = 1
        call get_environment_variable("amb_act", key, status=err)
@@ -175,11 +193,9 @@ contains
           read(key, '(i)', iostat=err) val
           if (val /= 0) a%state = 2
        end if
+       if (amb_amroot()) print *,'amb> act', a%state == 2
     end if
-
-    if (a%state /= 2) return
-    if (amb_amroot()) print *,'amb> here'
-  end subroutine act_vel_tend
+  end subroutine act_init
 
   subroutine lonlat2xyz(lon, lat, x, y, z)
     real(RKIND), intent(in) :: lon, lat
