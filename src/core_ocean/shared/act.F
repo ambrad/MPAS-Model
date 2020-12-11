@@ -15,18 +15,20 @@ module act
   implicit none
   private
 
-  public :: act_init_setup, act_init_validate, act_vel_tend
+  public :: act_init_setup, act_init_validate, act_velocity
 
   real(RKIND), parameter :: pi = 3.141592653589793d0
 
   type :: act_t
      integer :: state = 0
-     real(RKIND) :: sim_time
+     integer :: flow
   end type act_t
 
   type (act_t) :: a
 
 contains
+
+  !!! Public
 
   subroutine act_init_setup(domain, err)
     type (domain_type), intent(inout) :: domain
@@ -159,43 +161,136 @@ contains
     config_vert_levels = 3
   end subroutine act_init_validate
 
-  subroutine act_vel_tend(meshPool, days_since_start, dt, normalVelocity, tend_normalVelocity)
+  subroutine act_velocity(meshPool, days_since_start, dt, normalVelocity)
     type (mpas_pool_type), intent(in) :: meshPool
-    real(RKIND), intent(in) :: days_since_start, dt, normalVelocity(:,:)
-    real(RKIND), intent(inout) :: tend_normalVelocity(:,:)
+    real(RKIND), intent(in) :: days_since_start, dt
+    real(RKIND), intent(out) :: normalVelocity(:,:)
 
-    real(RKIND), dimension(:), pointer :: latEdge, lonEdge
+    real(RKIND), dimension(:), pointer :: latEdge, lonEdge, angleEdge
+    real(RKIND), pointer :: sphere_radius
+    real(RKIND) :: time_sec
     integer, pointer :: nEdges
     integer :: i
 
     call act_init()
     if (a%state /= 2) return
 
-    if (amb_amroot()) print *,'amb> days', days_since_start, 'dt', dt
+    time_sec = days_since_start*86400.0_RKIND + dt
+    call mpas_pool_get_config(meshPool, 'sphere_radius', sphere_radius)
+
     call mpas_pool_get_dimension(meshPool, 'nEdges', nEdges)
     call mpas_pool_get_array(meshPool, 'latEdge', latEdge)
     call mpas_pool_get_array(meshPool, 'lonEdge', lonEdge)
+    call mpas_pool_get_array(meshPool, 'angleEdge', angleEdge)
+
     do i = 1, nEdges
-       tend_normalVelocity(:,i) = 0
+       normalVelocity(:,i) = calc_vnml( &
+            time_sec, sphere_radius, lonEdge(i), latEdge(i), angleEdge(i))
     end do
-  end subroutine act_vel_tend
+  end subroutine act_velocity
+
+  !!! Private
 
   subroutine act_init()
     character (len=255) :: key
     integer :: err, val
 
-    if (a%state == 2) return
+    if (a%state /= 0) return
+
     call amb_init()
-    if (a%state == 0) then
-       a%state = 1
-       call get_environment_variable("amb_act", key, status=err)
-       if (err /= 1) then
-          read(key, '(i)', iostat=err) val
-          if (val /= 0) a%state = 2
-       end if
-       if (amb_amroot()) print *,'amb> act', a%state == 2
+
+    a%state = 1
+    call get_environment_variable("amb_act", key, status=err)
+    if (err /= 1) then
+       read(key, '(i)', iostat=err) val
+       if (val /= 0) a%state = 2
     end if
+    if (amb_amroot()) print *,'amb> act', a%state == 2
+
+    if (a%state /= 2) return
+
+    a%flow = 1
   end subroutine act_init
+
+  !! Initial conditions
+
+  function cosine_bells(lon, lat) result (cbs)
+    real(RKIND), intent(in) :: lon, lat
+    real(RKIND), parameter :: r = 0.5_RKIND, b = 0.1_RKIND, c = 0.9_RKIND, &
+         lon1 = 5*(pi/6), lat1 = 0, lon2 = -5*(pi/6), lat2 = 0
+    real(RKIND) :: cbs, x, y, z, x1, y1, z1, x2, y2, z2, r1, r2
+    call lonlat2xyz(lon, lat, x, y, z)
+    call lonlat2xyz(lon1, lat1, x1, y1, z1)
+    r1 = great_circle_dist_xyz(x, y, z, x1, y1, z1)
+    cbs = 0
+    if (r1 < r) then
+       cbs = cosine_bell(r1, r)
+    else
+       call lonlat2xyz(lon2, lat2, x2, y2, z2)
+       r2 = great_circle_dist_xyz(x, y, z, x2, y2, z2)
+       if (r2 < r) cbs = cosine_bell(r2, r)
+    end if
+  end function cosine_bells
+
+  function cosine_bell(ri, r) result(cb)
+    real(RKIND), intent(in) :: ri, r
+    real(RKIND) :: cb
+    real(RKIND), parameter :: hmax = 1._RKIND
+    cb = 0.5_RKIND*hmax*(1 + cos(pi*ri/r))
+  end function cosine_bell
+
+  function xyztrig(lon, lat) result (f)
+    real(RKIND), intent(in) :: lon, lat
+    real(RKIND) :: f, x, y, z
+    call lonlat2xyz(lon, lat, x, y, z)
+    f = 0.5_RKIND*(1 + sin(pi*x)*sin(pi*y)*sin(pi*z))
+  end function xyztrig
+
+  !! Flow fields
+
+  function calc_vnml(t, radius, lon, lat, theta) result(vnml)
+    real(RKIND), intent(in) :: t, radius, lon, lat, theta
+    real(RKIND) :: vnml, u, v
+    u = 0; v = 0
+    select case(a%flow)
+       case(1)
+          call flow_rotation(lon, lat, u, v)
+    end select
+    vnml = radius*(cos(theta)*u + sin(theta)*v)
+  end function calc_vnml
+
+  subroutine flow_rotation(lon, lat, u, v)
+    real(RKIND), intent(in) :: lon, lat
+    real(RKIND), intent(out) :: u, v
+    real(RKIND), parameter :: axis(3) = (/0,0,1/)
+    real(RKIND) :: Omega(3), r(3), vel(3), east(3), north(3)
+    Omega = (/0.2_RKIND, 0.7_RKIND, 1.0_RKIND/)
+    Omega = ((2*pi)/(12*86400))*(Omega/norm(Omega))
+    call lonlat2xyz(lon, lat, r(1), r(2), r(3))
+    call cross(axis, r, east)
+    east = east/norm(east)
+    call cross(r, east, north)
+    north = north/norm(north)
+    call cross(Omega, r, vel)
+    u = sum(vel*east)
+    v = sum(vel*north)
+  end subroutine flow_rotation
+
+  !! Utilities
+
+  function norm(x) result(nx)
+    real(RKIND), intent(in) :: x(3)
+    real(RKIND) :: nx
+    nx = sqrt(sum(x*x))
+  end function norm
+
+  subroutine cross(a, b, c)
+    real(RKIND), intent(in) :: a(3), b(3)
+    real(RKIND), intent(out) :: c(3)
+    c(1) = a(2)*b(3) - a(3)*b(2);
+    c(2) = a(3)*b(1) - a(1)*b(3);
+    c(3) = a(1)*b(2) - a(2)*b(1);
+  end subroutine cross
 
   subroutine lonlat2xyz(lon, lat, x, y, z)
     real(RKIND), intent(in) :: lon, lat
@@ -235,37 +330,5 @@ contains
     call lonlat2xyz(lon2, lat2, xB, yB, zB)
     dist = radius*great_circle_dist_xyz(xA, yA, zA, xB, yB, zB)
   end function great_circle_dist_ll
-
-  function cosine_bell(ri, r) result(cb)
-    real(RKIND), intent(in) :: ri, r
-    real(RKIND) :: cb
-    real(RKIND), parameter :: hmax = 1._RKIND
-    cb = 0.5_RKIND*hmax*(1 + cos(pi*ri/r))
-  end function cosine_bell
-
-  function cosine_bells(lon, lat) result (cbs)
-    real(RKIND), intent(in) :: lon, lat
-    real(RKIND), parameter :: r = 0.5_RKIND, b = 0.1_RKIND, c = 0.9_RKIND, &
-         lon1 = 5*(pi/6), lat1 = 0, lon2 = -5*(pi/6), lat2 = 0
-    real(RKIND) :: cbs, x, y, z, x1, y1, z1, x2, y2, z2, r1, r2
-    call lonlat2xyz(lon, lat, x, y, z)
-    call lonlat2xyz(lon1, lat1, x1, y1, z1)
-    r1 = great_circle_dist_xyz(x, y, z, x1, y1, z1)
-    cbs = 0
-    if (r1 < r) then
-       cbs = cosine_bell(r1, r)
-    else
-       call lonlat2xyz(lon2, lat2, x2, y2, z2)
-       r2 = great_circle_dist_xyz(x, y, z, x2, y2, z2)
-       if (r2 < r) cbs = cosine_bell(r2, r)
-    end if
-  end function cosine_bells
-
-  function xyztrig(lon, lat) result (f)
-    real(RKIND), intent(in) :: lon, lat
-    real(RKIND) :: f, x, y, z
-    call lonlat2xyz(lon, lat, x, y, z)
-    f = 0.5_RKIND*(1 + sin(pi*x)*sin(pi*y)*sin(pi*z))
-  end function xyztrig
 
 end module act

@@ -63,7 +63,7 @@ module ocn_tendency
    use ocn_vel_tidal_potential
 
    use amb
-   use act, only: act_vel_tend
+   use act, only: act_velocity
 
    implicit none
    private
@@ -211,7 +211,7 @@ contains
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_tend_vel(tendPool, statePool, forcingPool, diagnosticsPool, meshPool, scratchPool, timeLevelIn, dt, dt_substep)!{{{
+   subroutine ocn_tend_vel(tendPool, statePool, forcingPool, diagnosticsPool, meshPool, scratchPool, timeLevelIn, dt)!{{{
       implicit none
 
       type (mpas_pool_type), intent(inout) :: tendPool !< Input/Output: Tendency structure
@@ -219,7 +219,7 @@ contains
       type (mpas_pool_type), intent(inout) :: forcingPool !< Input: Forcing information
       type (mpas_pool_type), intent(in) :: diagnosticsPool !< Input: Diagnostic information
       type (mpas_pool_type), intent(in) :: meshPool !< Input: Mesh information
-      real (kind=RKIND), intent(in) :: dt, dt_substep
+      real (kind=RKIND), intent(in) :: dt
       type (mpas_pool_type), intent(inout) :: scratchPool !< Input: Scratch structure
       integer, intent(in), optional :: timeLevelIn !< Input: Time level for state fields
 
@@ -243,9 +243,6 @@ contains
       integer :: err, iEdge, iCell, k
       integer, pointer :: indexTemperature, indexSalinity, nEdges, nCells
       integer, dimension(:), pointer :: maxLevelCell
-
-      !amb
-      real (kind=RKIND), pointer :: daysSinceStartOfSim
 
       if (present(timeLevelIn)) then
          timeLevel = timeLevelIn
@@ -306,8 +303,6 @@ contains
       !$omp end do
       !$omp end parallel
 
-      call mpas_pool_get_array(diagnosticsPool, 'daysSinceStartOfSim',daysSinceStartOfSim)
-      call act_vel_tend(meshPool, daysSinceStartOfSim, dt_substep, normalVelocity, tend_normalVelocity)
       if(config_disable_vel_all_tend) return
 
       call mpas_timer_start("ocn_tend_vel")
@@ -399,7 +394,7 @@ contains
 !
 !-----------------------------------------------------------------------
    subroutine ocn_tend_tracer(tendPool, statePool, forcingPool, diagnosticsPool, meshPool, swForcingPool, scratchPool, & !{{{
-                              dt, activeTracersOnlyIn, timeLevelIn )
+                              dt, dt_substep, activeTracersOnlyIn, timeLevelIn )
       implicit none
 
       !
@@ -413,6 +408,7 @@ contains
       type (mpas_pool_type), intent(in)    :: swForcingPool   !< Input: sw data input info
       type (mpas_pool_type), intent(in)    :: scratchPool     !< Input: Scratch information
       real (kind=RKIND), intent(in) :: dt                     !< Input: Time step
+      real (kind=RKIND), intent(in) :: dt_substep             !< Input: Time at stage within step
       logical, intent(in), optional :: activeTracersOnlyIn    !< Input: if true, only compute for active tracers
       integer, intent(in), optional :: timeLevelIn            !< Input/Optional: Time Level Indes
 
@@ -500,6 +496,7 @@ contains
       integer :: poolidx
       logical :: active_tracers
       real (kind=RKIND), dimension(:,:), allocatable, target :: vertAleTransportTopCopy
+      real (kind=RKIND), pointer :: daysSinceStartOfSim
 
       !
       ! set time level of optional argument is present
@@ -558,6 +555,9 @@ contains
 
       call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
       call mpas_pool_get_dimension(meshPool, 'nEdges', nEdges)
+
+      call mpas_pool_get_array(diagnosticsPool, 'daysSinceStartOfSim',daysSinceStartOfSim)
+      call act_velocity(meshPool, daysSinceStartOfSim, dt_substep, normalTransportVelocity)
 
       !
       ! get diagnostic arrays for temperature/salinity budget

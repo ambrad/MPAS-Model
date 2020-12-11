@@ -861,7 +861,7 @@ module ocn_time_integration_rk4
             vertAleTransportTop, err)
       endif
 
-      call ocn_tend_vel(tendPool, provisStatePool, forcingPool, diagnosticsPool, meshPool, scratchPool, 1, dt, rkSubstepWeight)
+      call ocn_tend_vel(tendPool, provisStatePool, forcingPool, diagnosticsPool, meshPool, scratchPool, 1, dt)
 
    end subroutine ocn_time_integrator_rk4_compute_vel_tends!}}}
 
@@ -992,7 +992,7 @@ module ocn_time_integration_rk4
       endif
 
       call ocn_tend_tracer(tendPool, provisStatePool, forcingPool, diagnosticsPool, meshPool, swForcingPool, &
-                           scratchPool, dt, activeTracersOnlyIn=.false., timeLevelIn=1)
+                           scratchPool, dt, rkSubstepWeight, activeTracersOnlyIn=.false., timeLevelIn=1)
 
    end subroutine ocn_time_integrator_rk4_compute_tracer_tends!}}}
 
