@@ -17,7 +17,8 @@ module act
 
   public :: act_init_setup, act_init_validate, act_velocity
 
-  real(RKIND), parameter :: pi = 3.141592653589793d0
+  real(RKIND), parameter :: pi = 3.141592653589793d0, two_pi = 2.0_RKIND*pi, &
+       one_day = 86400.0_RKIND, twelve_days = 12.0_RKIND*one_day
 
   type :: act_t
      integer :: state = 0
@@ -114,9 +115,9 @@ contains
           
           if (associated(debugTracers)) then
              do k = 1, nVertLevels
-                debugTracers(1, k, iCell) = cos(2*pi*refZMid(k)/refZMid(nVertLevels))* &
+                debugTracers(1, k, iCell) = cos(two_pi*refZMid(k)/refZMid(nVertLevels))* &
                      xyztrig(lonCell(iCell), latCell(iCell))
-                debugTracers(2, k, iCell) = cos(2*pi*refZMid(k)/refZMid(nVertLevels))* &
+                debugTracers(2, k, iCell) = cos(two_pi*refZMid(k)/refZMid(nVertLevels))* &
                      cosine_bells(lonCell(iCell), latCell(iCell))
                 debugTracers(3, k, iCell) = 42.0d0
              end do
@@ -175,7 +176,7 @@ contains
     call act_init()
     if (a%state /= 2) return
 
-    time_sec = days_since_start*86400.0_RKIND + dt
+    time_sec = days_since_start*one_day + dt
     call mpas_pool_get_config(meshPool, 'sphere_radius', sphere_radius)
 
     call mpas_pool_get_dimension(meshPool, 'nEdges', nEdges)
@@ -210,6 +211,7 @@ contains
     if (a%state /= 2) return
 
     a%flow = 1
+    if (val >= 1 .and. val <= 2) a%flow = val
   end subroutine act_init
 
   !! Initial conditions
@@ -253,8 +255,8 @@ contains
     real(RKIND) :: vnml, u, v
     u = 0; v = 0
     select case(a%flow)
-       case(1)
-          call flow_rotation(lon, lat, u, v)
+       case(1); call flow_rotation    (   lon, lat, u, v)
+       case(2); call flow_nondivergent(t, lon, lat, u, v)
     end select
     vnml = radius*(cos(theta)*u + sin(theta)*v)
   end function calc_vnml
@@ -265,7 +267,7 @@ contains
     real(RKIND), parameter :: axis(3) = (/0,0,1/)
     real(RKIND) :: Omega(3), r(3), vel(3), east(3), north(3)
     Omega = (/0.2_RKIND, 0.7_RKIND, 1.0_RKIND/)
-    Omega = ((2*pi)/(12*86400))*(Omega/norm(Omega))
+    Omega = (two_pi/twelve_days)*(Omega/norm(Omega))
     call lonlat2xyz(lon, lat, r(1), r(2), r(3))
     call cross(axis, r, east)
     east = east/norm(east)
@@ -275,6 +277,17 @@ contains
     u = sum(vel*east)
     v = sum(vel*north)
   end subroutine flow_rotation
+
+  subroutine flow_nondivergent(t, lon, lat, u, v)
+    real(RKIND), intent(in) :: t, lon, lat
+    real(RKIND), intent(out) :: u, v
+    real(RKIND) :: lon_p, coslat, cost
+    lon_p = lon - two_pi*t/twelve_days
+    coslat = cos(lat)
+    cost = cos(pi*t/twelve_days)
+    u = (1/twelve_days)*(10*(sin(lon_p)**2)*sin(2*lat)*cost + two_pi*coslat)
+    v = (10/twelve_days)*sin(2*lon_p)*coslat*cost
+  end subroutine flow_nondivergent
 
   !! Utilities
 
