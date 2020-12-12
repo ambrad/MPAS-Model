@@ -167,9 +167,10 @@ contains
     real(RKIND), intent(in) :: days_since_start, dt
     real(RKIND), intent(out) :: normalVelocity(:,:)
 
-    real(RKIND), dimension(:), pointer :: latEdge, lonEdge, angleEdge
+    real(RKIND), dimension(:), pointer :: latEdge, lonEdge, angleEdge, latVertex, lonVertex
+    integer, dimension(:,:), pointer :: verticesOnEdge
     real(RKIND), pointer :: sphere_radius
-    real(RKIND) :: time_sec
+    real(RKIND) :: time_sec, nml(2)
     integer, pointer :: nEdges
     integer :: i
 
@@ -182,11 +183,18 @@ contains
     call mpas_pool_get_dimension(meshPool, 'nEdges', nEdges)
     call mpas_pool_get_array(meshPool, 'latEdge', latEdge)
     call mpas_pool_get_array(meshPool, 'lonEdge', lonEdge)
+    call mpas_pool_get_array(meshPool, 'latVertex', latVertex)
+    call mpas_pool_get_array(meshPool, 'lonVertex', lonVertex)
     call mpas_pool_get_array(meshPool, 'angleEdge', angleEdge)
+    call mpas_pool_get_array(meshPool, 'verticesOnEdge', verticesOnEdge)
 
     do i = 1, nEdges
+       call calc_edge_normal( &
+            lonVertex(verticesOnEdge(1,i)), latVertex(verticesOnEdge(1,i)), &
+            lonVertex(verticesOnEdge(2,i)), latVertex(verticesOnEdge(2,i)), &
+            nml)
        normalVelocity(:,i) = calc_vnml( &
-            time_sec, sphere_radius, lonEdge(i), latEdge(i), angleEdge(i))
+            time_sec, sphere_radius, lonEdge(i), latEdge(i), angleEdge(i), nml)
     end do
   end subroutine act_velocity
 
@@ -211,7 +219,7 @@ contains
     if (a%state /= 2) return
 
     a%flow = 1
-    if (val >= 1 .and. val <= 2) a%flow = val
+    if (val >= 1 .and. val <= 3) a%flow = val
   end subroutine act_init
 
   !! Initial conditions
@@ -250,30 +258,44 @@ contains
 
   !! Flow fields
 
-  function calc_vnml(t, radius, lon, lat, theta) result(vnml)
-    real(RKIND), intent(in) :: t, radius, lon, lat, theta
+  subroutine calc_edge_normal(lon1, lat1, lon2, lat2, nml_en)
+    real(RKIND), intent(in) :: lon1, lat1, lon2, lat2
+    real(RKIND), intent(out) :: nml_en(2)
+    real(RKIND) :: v1(3), v2(3), d(3), ec(3), nml(3), east(3), north(3)
+    call lonlat2xyz(lon1, lat1, v1(1), v1(2), v1(3))
+    call lonlat2xyz(lon2, lat2, v2(1), v2(2), v2(3))
+    d = v2 - v1
+    ec = (v1 + v2)/2
+    call cross(d, ec, nml)
+    nml = nml/norm(nml)
+    call calc_local_east_north(ec, east, north)
+    nml_en(1) = sum(nml*east)
+    nml_en(2) = sum(nml*north)
+    nml_en = nml_en/sqrt(sum(nml_en*nml_en))
+  end subroutine calc_edge_normal
+
+  function calc_vnml(t, radius, lon, lat, angle, nml) result(vnml)
+    real(RKIND), intent(in) :: t, radius, lon, lat, angle, nml(2)
     real(RKIND) :: vnml, u, v
     u = 0; v = 0
     select case(a%flow)
        case(1); call flow_rotation    (   lon, lat, u, v)
        case(2); call flow_nondivergent(t, lon, lat, u, v)
+       case(3); call flow_divergent   (t, lon, lat, u, v)
     end select
-    vnml = radius*(cos(theta)*u + sin(theta)*v)
+    vnml = radius*(nml(1)*u + nml(2)*v)
+    !vnml = radius*(cos(angle)*u + sin(angle)*v)
   end function calc_vnml
 
   subroutine flow_rotation(lon, lat, u, v)
     real(RKIND), intent(in) :: lon, lat
     real(RKIND), intent(out) :: u, v
-    real(RKIND), parameter :: axis(3) = (/0,0,1/)
     real(RKIND) :: Omega(3), r(3), vel(3), east(3), north(3)
     Omega = (/0.2_RKIND, 0.7_RKIND, 1.0_RKIND/)
     Omega = (two_pi/twelve_days)*(Omega/norm(Omega))
     call lonlat2xyz(lon, lat, r(1), r(2), r(3))
-    call cross(axis, r, east)
-    east = east/norm(east)
-    call cross(r, east, north)
-    north = north/norm(north)
     call cross(Omega, r, vel)
+    call calc_local_east_north(r, east, north)
     u = sum(vel*east)
     v = sum(vel*north)
   end subroutine flow_rotation
@@ -288,6 +310,17 @@ contains
     u = (1/twelve_days)*(10*(sin(lon_p)**2)*sin(2*lat)*cost + two_pi*coslat)
     v = (10/twelve_days)*sin(2*lon_p)*coslat*cost
   end subroutine flow_nondivergent
+
+  subroutine flow_divergent(t, lon, lat, u, v)
+    real(RKIND), intent(in) :: t, lon, lat
+    real(RKIND), intent(out) :: u, v
+    real(RKIND) :: lon_p, coslat, cost
+    lon_p = lon - two_pi*t/twelve_days
+    coslat = cos(lat)
+    cost = cos(pi*t/twelve_days)
+    u = (1/T)*(-5*(sin(lon_p/2)**2)*sin(2*lat)*(coslat**2)*cost + two_pi*coslat)
+    v = (2.5_RKIND/T)*sin(lon_p)*(coslat**3)*cost
+  end subroutine flow_divergent
 
   !! Utilities
 
@@ -304,6 +337,16 @@ contains
     c(2) = a(3)*b(1) - a(1)*b(3);
     c(3) = a(1)*b(2) - a(2)*b(1);
   end subroutine cross
+
+  subroutine calc_local_east_north(r, east, north)
+    real(RKIND), intent(in) :: r(3)
+    real(RKIND), intent(out) :: east(3), north(3)
+    real(RKIND), parameter :: axis(3) = (/0,0,1/)
+    call cross(axis, r, east)
+    east = east/norm(east)
+    call cross(r, east, north)
+    north = north/norm(north)
+  end subroutine calc_local_east_north
 
   subroutine lonlat2xyz(lon, lat, x, y, z)
     real(RKIND), intent(in) :: lon, lat
