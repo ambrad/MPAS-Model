@@ -201,6 +201,9 @@ module ocn_time_integration_rk4
       real (kind=RKIND), dimension(:,:), pointer :: restingThickness
       real (kind=RKIND) :: totalDepth
 
+      !amb
+      real (kind=RKIND), pointer :: daysSinceStartOfSim
+
       ! Get config options
       call mpas_pool_get_config(domain % configs, 'config_mom_del4', config_mom_del4)
       call mpas_pool_get_config(domain % configs, 'config_filter_btr_mode', config_filter_btr_mode)
@@ -393,6 +396,11 @@ module ocn_time_integration_rk4
         end if
 
         call mpas_pool_get_subpool(domain % blocklist % structs, 'diagnostics', diagnosticsPool)
+
+        !amb
+        call mpas_pool_get_array(diagnosticsPool, 'daysSinceStartOfSim', daysSinceStartOfSim)
+        call mpas_pool_get_array(diagnosticsPool, 'normalTransportVelocity', normalTransportVelocity)
+        call act_velocity(meshPool, daysSinceStartOfSim, rk_substep_weights(rk_step), normalTransportVelocity)
 
         ! Update halos for diagnostic variables.
         if (config_use_cvmix_kpp) then
@@ -992,95 +1000,9 @@ module ocn_time_integration_rk4
       endif
 
       call ocn_tend_tracer(tendPool, provisStatePool, forcingPool, diagnosticsPool, meshPool, swForcingPool, &
-                           scratchPool, dt, rkSubstepWeight, activeTracersOnlyIn=.false., timeLevelIn=1)
-
-   end subroutine ocn_time_integrator_rk4_compute_tracer_tends!}}}
-
-#if 0
-   subroutine ocn_time_integrator_rk4_compute_tends(block, dt, rkWeight, err)!{{{
-      type (block_type), intent(in) :: block
-      real (kind=RKIND), intent(in) :: dt
-      real (kind=RKIND), intent(in) :: rkWeight
-      integer, intent(out) :: err
-
-      type (mpas_pool_type), pointer :: meshPool, verticalMeshPool
-      type (mpas_pool_type), pointer :: statePool, diagnosticsPool, forcingPool
-      type (mpas_pool_type), pointer :: scratchPool, tendPool, provisStatePool
-      type (mpas_pool_type), pointer :: swForcingPool, tracersPool
-
-      real (kind=RKIND), dimension(:), pointer :: sshCur
-      real (kind=RKIND), dimension(:, :), pointer :: layerThicknessCur, normalVelocityCur
-      real (kind=RKIND), dimension(:, :), pointer :: layerThicknessEdge, vertAleTransportTop
-      real (kind=RKIND), dimension(:, :), pointer :: normalTransportVelocity
-      real (kind=RKIND), dimension(:, :), pointer ::  normalVelocityProvis, highFreqThicknessProvis
-
-      logical, pointer :: config_filter_btr_mode
-
-      err = 0
-
-      call mpas_pool_get_config(block % configs, 'config_filter_btr_mode', config_filter_btr_mode)
-
-      call mpas_pool_get_subpool(block % structs, 'mesh', meshPool)
-      call mpas_pool_get_subpool(block % structs, 'verticalMesh', verticalMeshPool)
-      call mpas_pool_get_subpool(block % structs, 'state', statePool)
-      call mpas_pool_get_subpool(block % structs, 'diagnostics', diagnosticsPool)
-      call mpas_pool_get_subpool(block % structs, 'forcing', forcingPool)
-      call mpas_pool_get_subpool(block % structs, 'scratch', scratchPool)
-      call mpas_pool_get_subpool(block % structs, 'tend', tendPool)
-      call mpas_pool_get_subpool(block % structs, 'provis_state', provisStatePool)
-      call mpas_pool_get_subpool(block % structs, 'shortwave', swForcingPool)
-
-      call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
-
-      call mpas_pool_get_array(statePool, 'layerThickness', layerThicknessCur, 1)
-      call mpas_pool_get_array(statePool, 'ssh', sshCur, 1)
-      call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocityCur, 1)
-
-      call mpas_pool_get_array(diagnosticsPool, 'layerThicknessEdge', layerThicknessEdge)
-      call mpas_pool_get_array(diagnosticsPool, 'vertAleTransportTop', vertAleTransportTop)
-      call mpas_pool_get_array(diagnosticsPool, 'normalTransportVelocity', normalTransportVelocity)
-
-      call mpas_pool_get_array(provisStatePool, 'normalVelocity', normalVelocityProvis, 1)
-      call mpas_pool_get_array(provisStatePool, 'highFreqThickness', highFreqThicknessProvis, 1)
-
-      ! advection of u uses u, while advection of layerThickness and tracers use normalTransportVelocity.
-      if (associated(highFreqThicknessProvis)) then
-         call ocn_vert_transport_velocity_top(meshPool, verticalMeshPool, scratchPool, &
-            layerThicknessCur,layerThicknessEdge, normalVelocityProvis, &
-            sshCur, rkWeight, &
-            vertAleTransportTop, err, highFreqThicknessProvis)
-      else
-         call ocn_vert_transport_velocity_top(meshPool, verticalMeshPool, scratchPool, &
-            layerThicknessCur,layerThicknessEdge, normalVelocityProvis, &
-            sshCur, rkWeight, &
-            vertAleTransportTop, err)
-      endif
-
-      call ocn_tend_vel(tendPool, provisStatePool, forcingPool, diagnosticsPool, meshPool, scratchPool, 1, dt)
-
-      if (associated(highFreqThicknessProvis)) then
-         call ocn_vert_transport_velocity_top(meshPool, verticalMeshPool, scratchPool, &
-            layerThicknessCur, layerThicknessEdge, normalTransportVelocity, &
-            sshCur, rkWeight, &
-            vertAleTransportTop, err, highFreqThicknessProvis)
-      else
-         call ocn_vert_transport_velocity_top(meshPool, verticalMeshPool, scratchPool, &
-            layerThicknessCur, layerThicknessEdge, normalTransportVelocity, &
-            sshCur, rkWeight, &
-            vertAleTransportTop, err)
-      endif
-
-      call ocn_tend_thick(tendPool, forcingPool, diagnosticsPool, meshPool)
-
-      if (config_filter_btr_mode) then
-          call ocn_filter_btr_mode_tend_vel(tendPool, provisStatePool, diagnosticsPool, meshPool, 1)
-      endif
-
-      call ocn_tend_tracer(tendPool, provisStatePool, forcingPool, diagnosticsPool, meshPool, swForcingPool, &
                            scratchPool, dt, activeTracersOnlyIn=.false., timeLevelIn=1)
 
-   end subroutine ocn_time_integrator_rk4_compute_tends!}}}
-#endif
+   end subroutine ocn_time_integrator_rk4_compute_tracer_tends!}}}
 
    subroutine ocn_time_integrator_rk4_diagnostic_update(block, dt, rkSubstepWeight, err)!{{{
       type (block_type), intent(in) :: block

@@ -1564,7 +1564,7 @@ module ocn_time_integration_split
             call mpas_pool_get_subpool(block % structs, 'scratch', scratchPool)
             call mpas_pool_get_subpool(block % structs, 'shortwave', swForcingPool)
             call ocn_tend_tracer(tendPool, statePool, forcingPool, diagnosticsPool, meshPool, swForcingPool, scratchPool, &
-                    dt, dt, activeTracersOnly, 2)
+                    dt, activeTracersOnly, 2)
 
             block => block % next
          end do
