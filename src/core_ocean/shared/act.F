@@ -318,8 +318,8 @@ contains
     lon_p = lon - two_pi*t/twelve_days
     coslat = cos(lat)
     cost = cos(pi*t/twelve_days)
-    u = (1/T)*(-5*(sin(lon_p/2)**2)*sin(2*lat)*(coslat**2)*cost + two_pi*coslat)
-    v = (2.5_RKIND/T)*sin(lon_p)*(coslat**3)*cost
+    u = (1/twelve_days)*(-5*(sin(lon_p/2)**2)*sin(2*lat)*(coslat**2)*cost + two_pi*coslat)
+    v = (2.5_RKIND/twelve_days)*sin(lon_p)*(coslat**3)*cost
   end subroutine flow_divergent
 
   !! Utilities
