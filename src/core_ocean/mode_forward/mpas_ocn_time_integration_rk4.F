@@ -389,18 +389,18 @@ module ocn_time_integration_rk4
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       ! BEGIN RK loop
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      call mpas_pool_get_subpool(domain % blocklist % structs, 'diagnostics', diagnosticsPool)
+      call mpas_pool_get_array(diagnosticsPool, 'daysSinceStartOfSim', daysSinceStartOfSim)
+      !call act_velocity(meshPool, daysSinceStartOfSim, 0.0_RKIND, normalVelocityCur)
       do rk_step = 1, 4
 
         if (config_disable_thick_all_tend .and. config_disable_vel_all_tend .and. config_disable_tr_all_tend) then
           exit ! don't compute in loop meant to update velocity, thickness, and tracers
         end if
 
-        call mpas_pool_get_subpool(domain % blocklist % structs, 'diagnostics', diagnosticsPool)
-
-        !amb
-        call mpas_pool_get_array(diagnosticsPool, 'daysSinceStartOfSim', daysSinceStartOfSim)
-        call mpas_pool_get_array(diagnosticsPool, 'normalTransportVelocity', normalTransportVelocity)
-        call act_velocity(meshPool, daysSinceStartOfSim, rk_substep_weights(rk_step), normalTransportVelocity)
+        call act_velocity(meshPool, daysSinceStartOfSim, rk_substep_weights(rk_step), normalVelocityNew)
+        !call mpas_pool_get_array(diagnosticsPool, 'normalTransportVelocity', normalTransportVelocity)
+        !call act_velocity(meshPool, daysSinceStartOfSim, rk_substep_weights(rk_step), normalTransportVelocity)
 
         ! Update halos for diagnostic variables.
         if (config_use_cvmix_kpp) then
