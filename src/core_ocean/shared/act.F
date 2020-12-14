@@ -1,6 +1,6 @@
 module act
   ! amb_sc   if defined, integer supercycle value
-  ! amb_act  if defined, any non-0 value
+  ! amb_act  if defined: 1 - rotation, 2 - nondivergent flow, 3 - divergent flow
 
   use mpas_kind_types
   use mpas_io_units
@@ -51,7 +51,7 @@ contains
     character (len=StrKIND), pointer :: config_init_configuration
 
     integer :: iCell, iEdge, iVertex, k, kML
-    real (kind=RKIND) :: temp, velocity, temperature, salinity
+    real (kind=RKIND) :: temp, velocity, temperature, salinity, vs
     
     err = 0
     call act_init()
@@ -115,11 +115,12 @@ contains
           
           if (associated(debugTracers)) then
              do k = 1, nVertLevels
-                debugTracers(1, k, iCell) = cos(two_pi*refZMid(k)/refZMid(nVertLevels))* &
-                     xyztrig(lonCell(iCell), latCell(iCell))
-                debugTracers(2, k, iCell) = cos(two_pi*refZMid(k)/refZMid(nVertLevels))* &
-                     cosine_bells(lonCell(iCell), latCell(iCell))
-                debugTracers(3, k, iCell) = 42.0d0
+                !vs = cos(two_pi*refZMid(k)/refZMid(nVertLevels))
+                vs = 1
+                debugTracers(1, k, iCell) = vs*xyztrig(lonCell(iCell), latCell(iCell))
+                debugTracers(2, k, iCell) = vs*cosine_bells(lonCell(iCell), latCell(iCell))
+                !debugTracers(3, k, iCell) = 42.0d0
+                debugTracers(3, k, iCell) = vs*slotted_cylinders(lonCell(iCell), latCell(iCell))
              end do
           endif
 
@@ -224,6 +225,13 @@ contains
 
   !! Initial conditions
 
+  function xyztrig(lon, lat) result (f)
+    real(RKIND), intent(in) :: lon, lat
+    real(RKIND) :: f, x, y, z
+    call lonlat2xyz(lon, lat, x, y, z)
+    f = 0.5_RKIND*(1 + sin(pi*x)*sin(pi*y)*sin(pi*z))
+  end function xyztrig
+
   function cosine_bells(lon, lat) result (cbs)
     real(RKIND), intent(in) :: lon, lat
     real(RKIND), parameter :: r = 0.5_RKIND, b = 0.1_RKIND, c = 0.9_RKIND, &
@@ -249,12 +257,33 @@ contains
     cb = 0.5_RKIND*hmax*(1 + cos(pi*ri/r))
   end function cosine_bell
 
-  function xyztrig(lon, lat) result (f)
+  function slotted_cylinders(lon, lat) result (scs)
     real(RKIND), intent(in) :: lon, lat
-    real(RKIND) :: f, x, y, z
+    real(RKIND), parameter :: b = 0.1_RKIND, c = 1._RKIND, R = 1._RKIND, Rh = R/2, &
+         lon_thr = Rh/(6*R), lat_thr = 5*(Rh/(12*R)), &
+         lon1 = 5*(pi/6), lat1 = 0, lon2 = -5*(pi/6), lat2 = 0
+    real(RKIND) :: scs, x, y, z, x1, y1, z1, x2, y2, z2, r1, r2, lon0
     call lonlat2xyz(lon, lat, x, y, z)
-    f = 0.5_RKIND*(1 + sin(pi*x)*sin(pi*y)*sin(pi*z))
-  end function xyztrig
+    lon0 = lon
+    if (lon0 > pi) lon0 = lon0 - two_pi
+    call lonlat2xyz(lon1, lat1, x1, y1, z1)
+    r1 = great_circle_dist_xyz(x, y, z, x1, y1, z1)
+    scs = b
+    if (r1 <= Rh) then
+       if ( (abs(lon0 - lon1) >= lon_thr) .or. &
+            (abs(lon0 - lon1) <  lon_thr .and. lat - lat1 < -lat_thr)) then
+          scs = c
+       end if
+    else
+       call lonlat2xyz(lon2, lat2, x2, y2, z2)
+       r2 = great_circle_dist_xyz(x, y, z, x2, y2, z2)
+       if (r2 <= Rh .and. &
+           ((abs(lon0 - lon2) >= lon_thr) .or. &
+            (abs(lon0 - lon2) <  lon_thr .and. lat - lat2 >  lat_thr))) then
+          scs = c
+       end if
+    end if
+  end function slotted_cylinders
 
   !! Flow fields
 
