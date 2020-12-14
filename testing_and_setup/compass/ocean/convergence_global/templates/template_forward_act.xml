@@ -6,9 +6,9 @@
 		<option name="config_block_decomp_file_prefix">'graph.info.part.'</option>
 		<!--option name="config_time_integrator">'split_explicit'</option-->
     <option name="config_time_integrator">'RK4'</option>
-		<option name="config_disable_thick_all_tend">.true.</option>
-		<option name="config_disable_thick_hadv">.true.</option>
-		<option name="config_disable_thick_vadv">.true.</option>
+		<option name="config_disable_thick_all_tend">.false.</option>
+		<option name="config_disable_thick_hadv">.false.</option>
+		<option name="config_disable_thick_vadv">.false.</option>
 		<option name="config_disable_thick_sflux">.true.</option>
 		<option name="config_disable_vel_all_tend">.true.</option>
 		<option name="config_disable_vel_coriolis">.true.</option>
