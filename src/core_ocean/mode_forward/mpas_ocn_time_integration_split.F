@@ -43,6 +43,7 @@ module ocn_time_integration_split
    use ocn_effective_density_in_land_ice
 
    use amb
+   use act
 
    implicit none
    private
@@ -235,6 +236,7 @@ module ocn_time_integration_split
 
       !amb
       logical :: updated_tracers, is_active, exchange
+      real (kind=RKIND), pointer :: daysSinceStartOfSim
 
       call mpas_timer_start("se timestep")
 
@@ -324,6 +326,9 @@ module ocn_time_integration_split
          nEdges = nEdgesPtr
 
          ! Initialize * variables that are used to compute baroclinic tendencies below.
+
+         call mpas_pool_get_array(diagnosticsPool, 'daysSinceStartOfSim', daysSinceStartOfSim)
+         call act_velocity(meshPool, daysSinceStartOfSim, dt/2, normalVelocityCur)
 
          !$omp parallel
          !$omp do schedule(runtime) private(k)
