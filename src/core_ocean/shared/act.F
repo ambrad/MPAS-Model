@@ -43,7 +43,7 @@ contains
     integer, dimension(:), pointer :: maxLevelCell
     real (kind=RKIND), pointer :: sphere_radius
     real (kind=RKIND), dimension(:), pointer :: refBottomDepth,refZMid, lonCell, &
-         latEdge, latCell, latVertex, bottomDepth, angleEdge, fCell, fEdge, fVertex, &
+         latEdge, latCell, latVertex, bottomDepth, fCell, fEdge, fVertex, &
          xCell, yCell, interfaceLocations
     real (kind=RKIND), dimension(:,:), pointer :: layerThickness, restingThickness, &
          normalVelocity
@@ -80,7 +80,6 @@ contains
 
        call mpas_pool_get_array(meshPool, 'maxLevelCell', maxLevelCell)
        call mpas_pool_get_array(meshPool, 'bottomDepth', bottomDepth)
-       call mpas_pool_get_array(meshPool, 'angleEdge', angleEdge)
        call mpas_pool_get_array(meshPool, 'latCell', latCell)
        call mpas_pool_get_array(meshPool, 'latEdge', latEdge)
        call mpas_pool_get_array(meshPool, 'latVertex', latVertex)
@@ -168,7 +167,7 @@ contains
     real(RKIND), intent(in) :: days_since_start, dt
     real(RKIND), intent(out) :: normalVelocity(:,:)
 
-    real(RKIND), dimension(:), pointer :: latEdge, lonEdge, angleEdge, latVertex, lonVertex
+    real(RKIND), dimension(:), pointer :: latEdge, lonEdge, latVertex, lonVertex
     integer, dimension(:,:), pointer :: verticesOnEdge
     real(RKIND), pointer :: sphere_radius
     real(RKIND) :: time_sec, nml(2)
@@ -186,16 +185,16 @@ contains
     call mpas_pool_get_array(meshPool, 'lonEdge', lonEdge)
     call mpas_pool_get_array(meshPool, 'latVertex', latVertex)
     call mpas_pool_get_array(meshPool, 'lonVertex', lonVertex)
-    call mpas_pool_get_array(meshPool, 'angleEdge', angleEdge)
     call mpas_pool_get_array(meshPool, 'verticesOnEdge', verticesOnEdge)
 
     do i = 1, nEdges
        call calc_edge_normal( &
+            lonEdge(i), latEdge(i), &
             lonVertex(verticesOnEdge(1,i)), latVertex(verticesOnEdge(1,i)), &
             lonVertex(verticesOnEdge(2,i)), latVertex(verticesOnEdge(2,i)), &
             nml)
        normalVelocity(:,i) = calc_vnml( &
-            time_sec, sphere_radius, lonEdge(i), latEdge(i), angleEdge(i), nml)
+            time_sec, sphere_radius, lonEdge(i), latEdge(i), nml)
     end do
   end subroutine act_velocity
 
@@ -287,14 +286,14 @@ contains
 
   !! Flow fields
 
-  subroutine calc_edge_normal(lon1, lat1, lon2, lat2, nml_en)
-    real(RKIND), intent(in) :: lon1, lat1, lon2, lat2
+  subroutine calc_edge_normal(lonc, latc, lon1, lat1, lon2, lat2, nml_en)
+    real(RKIND), intent(in) :: lonc, latc, lon1, lat1, lon2, lat2
     real(RKIND), intent(out) :: nml_en(2)
-    real(RKIND) :: v1(3), v2(3), d(3), ec(3), nml(3), east(3), north(3)
+    real(RKIND) :: ec(3), v1(3), v2(3), d(3), nml(3), east(3), north(3)
+    call lonlat2xyz(lonc, latc, ec(1), ec(2), ec(3))
     call lonlat2xyz(lon1, lat1, v1(1), v1(2), v1(3))
     call lonlat2xyz(lon2, lat2, v2(1), v2(2), v2(3))
     d = v2 - v1
-    ec = (v1 + v2)/2
     call cross(d, ec, nml)
     nml = nml/norm(nml)
     call calc_local_east_north(ec, east, north)
@@ -303,8 +302,8 @@ contains
     nml_en = nml_en/sqrt(sum(nml_en*nml_en))
   end subroutine calc_edge_normal
 
-  function calc_vnml(t, radius, lon, lat, angle, nml) result(vnml)
-    real(RKIND), intent(in) :: t, radius, lon, lat, angle, nml(2)
+  function calc_vnml(t, radius, lon, lat, nml) result(vnml)
+    real(RKIND), intent(in) :: t, radius, lon, lat, nml(2)
     real(RKIND) :: vnml, u, v
     u = 0; v = 0
     select case(a%flow)
@@ -313,7 +312,6 @@ contains
        case(3); call flow_divergent   (t, lon, lat, u, v)
     end select
     vnml = radius*(nml(1)*u + nml(2)*v)
-    !vnml = radius*(cos(angle)*u + sin(angle)*v)
   end function calc_vnml
 
   subroutine flow_rotation(lon, lat, u, v)
