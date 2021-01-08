@@ -492,7 +492,7 @@ contains
       !amb
       real(RKIND) :: dtuse
       integer :: poolidx
-      logical :: active_tracers
+      logical :: active_tracers, zero_surface_flux
       real (kind=RKIND), dimension(:,:), allocatable, target :: vertAleTransportTopCopy
 
       !
@@ -600,6 +600,7 @@ contains
             call mpas_pool_get_config(ocnConfigs, modifiedConfigName, config_use_tracerGroup)
             
             if ( config_use_tracerGroup ) then
+               zero_surface_flux = .true.
                dtuse = dt
                if (amb_use()) then
                   poolidx = poolidx + 1
@@ -609,7 +610,10 @@ contains
                      call amb_accum(normalThicknessFlux, vertAleTransportTop)
                   else
                      if (trim(groupItr % memberName) == 'ecosysTracers') then
-                        call ocn_tracer_ecosys_surface_flux_accumulate_fluxes(forcingPool, nCellsSolve)
+                        modifiedGroupName = trim(groupItr % memberName) // "SurfaceFlux"
+                        call mpas_pool_get_array(tracersSurfaceFluxPool, trim(modifiedGroupName), tracerGroupSurfaceFlux)
+                        call ocn_tracer_ecosys_surface_flux_accumulate_fluxes(forcingPool, nCellsSolve, tracerGroupSurfaceFlux)
+                        zero_surface_flux = .false.
                      end if
                      if (.not. amb_is_tracer_step()) cycle
                      dtuse = amb_get_supercycle()*dt
@@ -660,14 +664,24 @@ contains
                !
                ! initialize tracer surface flux and tendency to zero.
                !
-               !$omp parallel
-               !$omp do schedule(runtime)
-               do iCell = 1, nCells
-                 tracerGroupTend(:,:, iCell) = 0.0_RKIND
-                 tracerGroupSurfaceFlux(:, iCell) = 0.0_RKIND
-               end do
-               !$omp end do
-               !$omp end parallel
+               if (zero_surface_flux) then
+                  !$omp parallel
+                  !$omp do schedule(runtime)
+                  do iCell = 1, nCells
+                     tracerGroupTend(:,:, iCell) = 0.0_RKIND
+                     tracerGroupSurfaceFlux(:, iCell) = 0.0_RKIND
+                  end do
+                  !$omp end do
+                  !$omp end parallel
+               else
+                  !$omp parallel
+                  !$omp do schedule(runtime)
+                  do iCell = 1, nCells
+                     tracerGroupTend(:,:, iCell) = 0.0_RKIND
+                  end do
+                  !$omp end do
+                  !$omp end parallel
+               end if
 
                !
                ! fill components of surface tracer flux

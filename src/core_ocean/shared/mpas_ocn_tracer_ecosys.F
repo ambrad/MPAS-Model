@@ -991,9 +991,10 @@ contains
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_tracer_ecosys_surface_flux_accumulate_fluxes(forcingPool, nCellsSolve)!{{{
+   subroutine ocn_tracer_ecosys_surface_flux_accumulate_fluxes(forcingPool, nCellsSolve, flux)!{{{
      type (mpas_pool_type), intent(inout) :: forcingPool
      integer, intent(in) :: nCellsSolve
+     real (kind=RKIND), dimension(:,:), intent(inout) :: flux
      
      type (mpas_pool_type), pointer :: ecosysAuxiliary, ecosysSeaIceCoupling
 
@@ -1056,50 +1057,41 @@ contains
 
      if (amb_get_supercycle() == 1 .or. &
           modulo(amb_get_timestep(), amb_get_supercycle()) == 1) then
-        call fill_indices(idxs)
-        do i = 1,12
-           if (idxs(i,1) > 0) BGC_forcing%depositionFlux(column,idxs(i,1)) = 0
-           if (idxs(i,2) > 0) BGC_forcing%riverFlux(column,idxs(i,2)) = 0
-           if (config_use_ecosysTracers_sea_ice_coupling .and. idxs(i,3) > 0) then
-              BGC_forcing%seaIceFlux(column,idxs(i,3)) = 0
-           end if
-        end do
+        flux = 0
      end if
-
+     
      do iCell=1,nCellsSolve
-        BGC_forcing%depositionFlux(column,BGC_indices%no3_ind) = BGC_forcing%depositionFlux(column,BGC_indices%no3_ind) + depositionFluxNO3(iCell)*convertLengthMKStoCGS
-        BGC_forcing%depositionFlux(column,BGC_indices%nh4_ind) = BGC_forcing%depositionFlux(column,BGC_indices%nh4_ind) + depositionFluxNH4(iCell)*convertLengthMKStoCGS
-        BGC_forcing%depositionFlux(column,BGC_indices%fe_ind)  = BGC_forcing%depositionFlux(column,BGC_indices%fe_ind)  + IRON_FLUX_IN(iCell)*convertLengthMKStoCGS
+        flux( 1,iCell) = flux( 1,iCell) + depositionFluxNO3(iCell)*convertLengthMKStoCGS
+        flux( 2,iCell) = flux( 2,iCell) + depositionFluxNH4(iCell)*convertLengthMKStoCGS
+        flux( 3,iCell) = flux( 3,iCell) + IRON_FLUX_IN(iCell)*convertLengthMKStoCGS
 
-        BGC_forcing%riverFlux(column,BGC_indices%no3_ind)         = BGC_forcing%riverFlux(column,BGC_indices%no3_ind)         + riverFluxNO3(iCell)*convertLengthMKStoCGS
-        BGC_forcing%riverFlux(column,BGC_indices%po4_ind)         = BGC_forcing%riverFlux(column,BGC_indices%po4_ind)         + riverFluxPO4(iCell)*convertLengthMKStoCGS
-        BGC_forcing%riverFlux(column,BGC_indices%don_ind)         = BGC_forcing%riverFlux(column,BGC_indices%don_ind)         + riverFluxDON(iCell) * 0.9_BGC_r8*convertLengthMKStoCGS
-        BGC_forcing%riverFlux(column,BGC_indices%donr_ind)        = BGC_forcing%riverFlux(column,BGC_indices%donr_ind)        + riverFluxDON(iCell) * 0.1_BGC_r8*convertLengthMKStoCGS
-        BGC_forcing%riverFlux(column,BGC_indices%dop_ind)         = BGC_forcing%riverFlux(column,BGC_indices%dop_ind)         + riverFluxDOP(iCell) * 0.975_BGC_r8*convertLengthMKStoCGS
-        BGC_forcing%riverFlux(column,BGC_indices%dopr_ind)        = BGC_forcing%riverFlux(column,BGC_indices%dopr_ind)        + riverFluxDOP(iCell) * 0.025_BGC_r8*convertLengthMKStoCGS
-        BGC_forcing%riverFlux(column,BGC_indices%sio3_ind)        = BGC_forcing%riverFlux(column,BGC_indices%sio3_ind)        + riverFluxSiO3(iCell)*convertLengthMKStoCGS
-        BGC_forcing%riverFlux(column,BGC_indices%fe_ind)          = BGC_forcing%riverFlux(column,BGC_indices%fe_ind)          + riverFluxFe(iCell)*convertLengthMKStoCGS / parm_Fe_bioavail
-        BGC_forcing%riverFlux(column,BGC_indices%dic_ind)         = BGC_forcing%riverFlux(column,BGC_indices%dic_ind)         + riverFluxDIC(iCell)*convertLengthMKStoCGS
-        BGC_forcing%riverFlux(column,BGC_indices%dic_alt_co2_ind) = BGC_forcing%riverFlux(column,BGC_indices%dic_alt_co2_ind) + riverFluxDIC(iCell)*convertLengthMKStoCGS
-        BGC_forcing%riverFlux(column,BGC_indices%alk_ind)         = BGC_forcing%riverFlux(column,BGC_indices%alk_ind)         + riverFluxALK(iCell)*convertLengthMKStoCGS
-        BGC_forcing%riverFlux(column,BGC_indices%doc_ind)         = BGC_forcing%riverFlux(column,BGC_indices%doc_ind)         + riverFluxDOC(iCell)*convertLengthMKStoCGS
+        flux( 4,iCell) = flux( 4,iCell) + riverFluxNO3(iCell)*convertLengthMKStoCGS
+        flux( 5,iCell) = flux( 5,iCell) + riverFluxPO4(iCell)*convertLengthMKStoCGS
+        flux( 6,iCell) = flux( 6,iCell) + riverFluxDON(iCell) * 0.9_BGC_r8*convertLengthMKStoCGS
+        flux( 7,iCell) = flux( 7,iCell) + riverFluxDON(iCell) * 0.1_BGC_r8*convertLengthMKStoCGS
+        flux( 8,iCell) = flux( 8,iCell) + riverFluxDOP(iCell) * 0.975_BGC_r8*convertLengthMKStoCGS
+        flux( 9,iCell) = flux( 9,iCell) + riverFluxDOP(iCell) * 0.025_BGC_r8*convertLengthMKStoCGS
+        flux(10,iCell) = flux(10,iCell) + riverFluxSiO3(iCell)*convertLengthMKStoCGS
+        flux(11,iCell) = flux(11,iCell) + riverFluxFe(iCell)*convertLengthMKStoCGS / parm_Fe_bioavail
+        flux(12,iCell) = flux(12,iCell) + riverFluxDIC(iCell)*convertLengthMKStoCGS
+        flux(13,iCell) = flux(13,iCell) + riverFluxDIC(iCell)*convertLengthMKStoCGS
+        flux(14,iCell) = flux(14,iCell) + riverFluxALK(iCell)*convertLengthMKStoCGS
+        flux(15,iCell) = flux(15,iCell) + riverFluxDOC(iCell)*convertLengthMKStoCGS
 
         if (config_use_ecosysTracers_sea_ice_coupling) then
-           !maltrud sea ice fluxes are already correct MPAS units, so change to POP units
-           BGC_forcing%seaIceFlux(column,BGC_indices%no3_ind)         = BGC_forcing%seaIceFlux(column,BGC_indices%no3_ind)         + iceFluxNO3(iCell)*convertLengthMKStoCGS
-           BGC_forcing%seaIceFlux(column,BGC_indices%don_ind)         = BGC_forcing%seaIceFlux(column,BGC_indices%don_ind)         + iceFluxDON(iCell)*convertLengthMKStoCGS
-           !maltrud sea ice BGC doesnt care about C or N--this is just a placeholder--so assume N units                                                                        
-           BGC_forcing%seaIceFlux(column,BGC_indices%donr_ind)        = BGC_forcing%seaIceFlux(column,BGC_indices%donr_ind)        + iceFluxDOCr(iCell)*convertLengthMKStoCGS
-           BGC_forcing%seaIceFlux(column,BGC_indices%sio3_ind)        = BGC_forcing%seaIceFlux(column,BGC_indices%sio3_ind)        + iceFluxSiO3(iCell)*convertLengthMKStoCGS
-           BGC_forcing%seaIceFlux(column,BGC_indices%nh4_ind)         = BGC_forcing%seaIceFlux(column,BGC_indices%nh4_ind)         + iceFluxNH4(iCell)*convertLengthMKStoCGS
-           BGC_forcing%seaIceFlux(column,BGC_indices%fe_ind)          = BGC_forcing%seaIceFlux(column,BGC_indices%fe_ind)          + iceFluxFeDissolved(iCell)*convertLengthMKStoCGS / parm_Fe_bioavail
-           BGC_forcing%seaIceFlux(column,BGC_indices%dic_ind)         = BGC_forcing%seaIceFlux(column,BGC_indices%dic_ind)         + iceFluxDIC(iCell)*convertLengthMKStoCGS
-           BGC_forcing%seaIceFlux(column,BGC_indices%dic_alt_co2_ind) = BGC_forcing%seaIceFlux(column,BGC_indices%dic_alt_co2_ind) + iceFluxDIC(iCell)*convertLengthMKStoCGS
-           BGC_forcing%seaIceFlux(column,BGC_indices%doc_ind)         = BGC_forcing%seaIceFlux(column,BGC_indices%doc_ind)         + iceFluxDOC(1,iCell)*convertLengthMKStoCGS + iceFluxDOC(2,iCell)*convertLengthMKStoCGS
-           BGC_forcing%seaIceFlux(column,BGC_indices%diatC_ind)       = BGC_forcing%seaIceFlux(column,BGC_indices%diatC_ind)       + iceFluxPhytoC(1,iCell)*convertLengthMKStoCGS
-           BGC_forcing%seaIceFlux(column,BGC_indices%spC_ind)         = BGC_forcing%seaIceFlux(column,BGC_indices%spC_ind)         + iceFluxPhytoC(2,iCell)*convertLengthMKStoCGS
-           BGC_forcing%seaIceFlux(column,BGC_indices%phaeoC_ind)      = BGC_forcing%seaIceFlux(column,BGC_indices%phaeoC_ind)      + iceFluxPhytoC(3,iCell)*convertLengthMKStoCGS
-         endif
+           flux(16,iCell) = flux(16,iCell) + iceFluxNO3(iCell)*convertLengthMKStoCGS
+           flux(17,iCell) = flux(17,iCell) + iceFluxDON(iCell)*convertLengthMKStoCGS
+           flux(18,iCell) = flux(18,iCell) + iceFluxDOCr(iCell)*convertLengthMKStoCGS
+           flux(19,iCell) = flux(19,iCell) + iceFluxSiO3(iCell)*convertLengthMKStoCGS
+           flux(20,iCell) = flux(20,iCell) + iceFluxNH4(iCell)*convertLengthMKStoCGS
+           flux(21,iCell) = flux(21,iCell) + iceFluxFeDissolved(iCell)*convertLengthMKStoCGS / parm_Fe_bioavail
+           flux(22,iCell) = flux(22,iCell) + iceFluxDIC(iCell)*convertLengthMKStoCGS
+           flux(23,iCell) = flux(23,iCell) + iceFluxDIC(iCell)*convertLengthMKStoCGS
+           flux(24,iCell) = flux(24,iCell) + iceFluxDOC(1,iCell)*convertLengthMKStoCGS + iceFluxDOC(2,iCell)*convertLengthMKStoCGS
+           flux(25,iCell) = flux(25,iCell) + iceFluxPhytoC(1,iCell)*convertLengthMKStoCGS
+           flux(26,iCell) = flux(26,iCell) + iceFluxPhytoC(2,iCell)*convertLengthMKStoCGS
+           flux(27,iCell) = flux(27,iCell) + iceFluxPhytoC(3,iCell)*convertLengthMKStoCGS
+        endif
      end do
    end subroutine ocn_tracer_ecosys_surface_flux_accumulate_fluxes!}}}
 
@@ -1165,7 +1157,7 @@ contains
                                         ecosysSeaIceCoupling
 
       integer :: numColumns, column, iCell, iTracer, iLevelSurface
-      integer :: idxs(12,3), supcyc, i
+      integer :: supcyc
 
 ! input flux components in forcing pool
       real (kind=RKIND), dimension(:), pointer :: &
@@ -1312,17 +1304,7 @@ contains
       column = 1
       iLevelSurface = 1
       
-      if (amb_use()) then
-         supcyc = amb_get_supercycle()
-         call fill_indices(idxs)
-         do i = 1,12
-            if (idxs(i,1) > 0) BGC_forcing%depositionFlux(column,idxs(i,1)) = BGC_forcing%depositionFlux(column,idxs(i,1))/supcyc
-            if (idxs(i,2) > 0) BGC_forcing%riverFlux(column,idxs(i,2)) = BGC_forcing%riverFlux(column,idxs(i,2))/supcyc
-            if (config_use_ecosysTracers_sea_ice_coupling .and. idxs(i,3) > 0) then
-               BGC_forcing%seaIceFlux(column,idxs(i,3)) = BGC_forcing%seaIceFlux(column,idxs(i,3))/supcyc
-            end if
-         end do
-      end if
+      if (amb_use()) supcyc = amb_get_supercycle()
 
       !DWJ 08/05/2016: This loop needs OpenMP added to it.
       do iCell=1,nCellsSolve
@@ -1350,7 +1332,41 @@ contains
          BGC_input%BGC_tracers(1,column,BGC_indices%sio3_ind) = ecosysTracers(ecosysIndices%sio3_ind,1,iCell)
          BGC_input%BGC_tracers(1,column,BGC_indices%o2_ind) = ecosysTracers(ecosysIndices%o2_ind,1,iCell)
 
-         if (.not. amb_use()) then
+         if (amb_use()) then
+            ecosysSurfaceFlux(1:27,iCell) = ecosysSurfaceFlux(1:27,iCell) / supcyc
+
+            BGC_forcing%depositionFlux(column,BGC_indices%no3_ind)    = ecosysSurfaceFlux( 1,iCell)
+            BGC_forcing%depositionFlux(column,BGC_indices%nh4_ind)    = ecosysSurfaceFlux( 2,iCell)
+            BGC_forcing%depositionFlux(column,BGC_indices%fe_ind)     = ecosysSurfaceFlux( 3,iCell)
+                                                                                      
+            BGC_forcing%riverFlux(column,BGC_indices%no3_ind)         = ecosysSurfaceFlux( 4,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%po4_ind)         = ecosysSurfaceFlux( 5,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%don_ind)         = ecosysSurfaceFlux( 6,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%donr_ind)        = ecosysSurfaceFlux( 7,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%dop_ind)         = ecosysSurfaceFlux( 8,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%dopr_ind)        = ecosysSurfaceFlux( 9,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%sio3_ind)        = ecosysSurfaceFlux(10,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%fe_ind)          = ecosysSurfaceFlux(11,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%dic_ind)         = ecosysSurfaceFlux(12,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%dic_alt_co2_ind) = ecosysSurfaceFlux(13,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%alk_ind)         = ecosysSurfaceFlux(14,iCell)
+            BGC_forcing%riverFlux(column,BGC_indices%doc_ind)         = ecosysSurfaceFlux(15,iCell)
+
+            if (config_use_ecosysTracers_sea_ice_coupling) then
+               BGC_forcing%seaIceFlux(column,BGC_indices%no3_ind)         = ecosysSurfaceFlux(16,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%don_ind)         = ecosysSurfaceFlux(17,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%donr_ind)        = ecosysSurfaceFlux(18,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%sio3_ind)        = ecosysSurfaceFlux(19,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%nh4_ind)         = ecosysSurfaceFlux(20,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%fe_ind)          = ecosysSurfaceFlux(21,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%dic_ind)         = ecosysSurfaceFlux(22,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%dic_alt_co2_ind) = ecosysSurfaceFlux(23,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%doc_ind)         = ecosysSurfaceFlux(24,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%diatC_ind)       = ecosysSurfaceFlux(25,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%spC_ind)         = ecosysSurfaceFlux(26,iCell)
+               BGC_forcing%seaIceFlux(column,BGC_indices%phaeoC_ind)      = ecosysSurfaceFlux(27,iCell)
+            endif
+         else
             ! NOTE pass in total Fe and mult by parm_Fe_bioavail inside the flux routine
             !             divide river Fe by bioavail since it is already the available to make it total
             
