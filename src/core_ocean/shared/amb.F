@@ -56,7 +56,7 @@ contains
 
   function amb_is_tracer_step() result(b)
     logical :: b
-    b = mod(timestep, supercycle) == 0
+    b = modulo(timestep, supercycle) == 0
   end function amb_is_tracer_step
 
   function amb_amroot() result(ar)
@@ -100,7 +100,7 @@ contains
     if (.not. allocated(layerThickness0)) &
        allocate(layerThickness0(size(layerThickness,1), size(layerThickness,2)))
 
-    if (mod(timestep-1, supercycle) == 0) &
+    if (modulo(timestep-1, supercycle) == 0) &
        layerThickness0(:,:) = layerThickness(:,:)
   end subroutine amb_set_layerThickness0
 
@@ -117,7 +117,7 @@ contains
        if (amroot .and. verbose > 0) print *,'amb> accum alloc'
     end if
 
-    if (mod(timestep-1, supercycle) == 0) then
+    if (modulo(timestep-1, supercycle) == 0) then
        if (amroot .and. verbose > 0) print *,'amb> accum zero'
        accumNormalThicknessFlux(:,:) = 0
        accumVertAleTransportTop(:,:) = 0
@@ -145,7 +145,7 @@ contains
 
     integer :: ic, k
 
-    if (mod(timestep, supercycle) /= 0) then
+    if (modulo(timestep, supercycle) /= 0) then
        tnew(:,:,:) = tcur(:,:,:)
        return
     end if
@@ -170,7 +170,7 @@ contains
     integer :: idx, ic, k, iq, ierr
     real(8) :: maxerr, mass, send(ndbgq), recv(ndbgq), err
 
-    if (mod(timestep-1, 10) == 0) then
+    if (modulo(timestep-1, 10) == 0) then
        ! Debug tracer 3 mixing ratio is uniformly 42. Check departure from that.
        maxerr = 0
        do ic = 1, nCells
@@ -188,7 +188,7 @@ contains
        overall_maxerr = max(overall_maxerr, maxerr)
     end if
 
-    if (mod(timestep-1, 50) == 0) then
+    if (modulo(timestep-1, 50) == 0) then
        do iq = 1, ndbgq
           mass = 0
           do ic = 1, nCells
