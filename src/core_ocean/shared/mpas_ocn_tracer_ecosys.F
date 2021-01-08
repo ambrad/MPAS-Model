@@ -1025,9 +1025,7 @@ contains
 
      real (kind=RKIND), dimension(:,:), pointer :: iceFluxDOC, iceFluxPhytoC
 
-     integer, parameter :: column = 1
-
-     integer :: iCell, idxs(12,3), i
+     integer :: iCell
 
      call mpas_pool_get_subpool(forcingPool, 'ecosysAuxiliary', ecosysAuxiliary)
      call mpas_pool_get_array(ecosysAuxiliary, 'depositionFluxNO3', depositionFluxNO3)
@@ -1366,6 +1364,8 @@ contains
                BGC_forcing%seaIceFlux(column,BGC_indices%spC_ind)         = ecosysSurfaceFlux(26,iCell)
                BGC_forcing%seaIceFlux(column,BGC_indices%phaeoC_ind)      = ecosysSurfaceFlux(27,iCell)
             endif
+
+            ecosysSurfaceFlux(:,iCell) = 0
          else
             ! NOTE pass in total Fe and mult by parm_Fe_bioavail inside the flux routine
             !             divide river Fe by bioavail since it is already the available to make it total
