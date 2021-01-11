@@ -968,11 +968,14 @@ contains
      integer, intent(out) :: idxs(12,3)
 
      idxs = -1
+     ! deposition
      idxs(1:3,1) = (/BGC_indices%no3_ind,BGC_indices%nh4_ind,BGC_indices%fe_ind/)
+     ! river
      idxs(1:12,2) = (/BGC_indices%no3_ind,BGC_indices%po4_ind,BGC_indices%don_ind, &
           BGC_indices%donr_ind,BGC_indices%dop_ind,BGC_indices%dopr_ind, &
           BGC_indices%sio3_ind,BGC_indices%fe_ind,BGC_indices%dic_ind, &
           BGC_indices%dic_alt_co2_ind,BGC_indices%alk_ind,BGC_indices%doc_ind/)
+     ! ice
      idxs(1:12,3) = (/BGC_indices%no3_ind,BGC_indices%don_ind,BGC_indices%donr_ind, &
           BGC_indices%sio3_ind,BGC_indices%nh4_ind,BGC_indices%fe_ind, &
           BGC_indices%dic_ind,BGC_indices%dic_alt_co2_ind,BGC_indices%doc_ind, &
