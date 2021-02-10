@@ -6,6 +6,7 @@ module amb
   ! ~/mpas/mpas/src/core_ocean/shared/mpas_ocn_tendency.F
   ! ~/mpas/mpas/src/core_ocean/shared/mpas_ocn_tracer_advection.F
   
+  use mpas_kind_types
   use mpi
 
   implicit none
@@ -23,8 +24,8 @@ module amb
 
   integer :: timestep, split_explicit_step, n_ts_iter
 
-  real(8), allocatable :: layerThickness0(:,:), accumNormalThicknessFlux(:,:), &
-       accumVertAleTransportTop(:,:)
+  real(RKIND), allocatable, target :: layerThickness0(:,:), accumVertAleTransportTop(:,:)
+  real(RKIND), allocatable :: accumNormalThicknessFlux(:,:)
 
 contains
 
@@ -93,19 +94,21 @@ contains
   end subroutine amb_init
 
   subroutine amb_set_layerThickness0(layerThickness)
-    real(8), intent(in) :: layerThickness(:,:)
+    real(RKIND), intent(in) :: layerThickness(:,:)
 
     if (split_explicit_step /= n_ts_iter) return
 
-    if (.not. allocated(layerThickness0)) &
+    if (.not. allocated(layerThickness0)) then
        allocate(layerThickness0(size(layerThickness,1), size(layerThickness,2)))
+    end if
 
-    if (modulo(timestep-1, supercycle) == 0) &
+    if (modulo(timestep-1, supercycle) == 0) then
        layerThickness0(:,:) = layerThickness(:,:)
+    end if
   end subroutine amb_set_layerThickness0
 
   subroutine amb_accum(normalThicknessFlux, vertAleTransportTop)
-    real(8), intent(in) :: normalThicknessFlux(:,:), vertAleTransportTop(:,:)
+    real(RKIND), intent(in) :: normalThicknessFlux(:,:), vertAleTransportTop(:,:)
 
     if (split_explicit_step /= n_ts_iter) return
 
@@ -126,22 +129,29 @@ contains
     if (amroot .and. verbose > 0) print *,'amb> accum accum',timestep,split_explicit_step
     accumNormalThicknessFlux = accumNormalThicknessFlux + normalThicknessFlux
     accumVertAleTransportTop = accumVertAleTransportTop + vertAleTransportTop
+
+    if (amb_is_tracer_step()) then
+       accumNormalThicknessFlux = accumNormalThicknessFlux/supercycle
+       accumVertAleTransportTop = accumVertAleTransportTop/supercycle
+    end if
   end subroutine amb_accum
 
-  subroutine amb_fill(normalThicknessFlux, vertAleTransportTop)
-    real(8), intent(out) :: normalThicknessFlux(:,:), vertAleTransportTop(:,:)
+  subroutine amb_fill(normalThicknessFlux, vertAleTransportTop, layerThickness)
+    real(RKIND), intent(out) :: normalThicknessFlux(:,:)
+    real(RKIND), intent(out), pointer :: vertAleTransportTop(:,:), layerThickness(:,:)
 
     if (split_explicit_step /= n_ts_iter) print *, 'amb> amb_fill: should not be here'
 
     if (amroot .and. verbose > 0) print *,'amb> fill',timestep,split_explicit_step
-    normalThicknessFlux = accumNormalThicknessFlux/supercycle
-    vertAleTransportTop = accumVertAleTransportTop/supercycle
+    normalThicknessFlux = accumNormalThicknessFlux
+    vertAleTransportTop => accumVertAleTransportTop
+    layerThickness => layerThickness0
   end subroutine amb_fill
 
   subroutine amb_update(maxLevelCell, nCells, dt, tcur, ttend, lyrnew, tnew)
     integer, intent(in) :: maxLevelCell(:), nCells
-    real(8), intent(in) :: dt, tcur(:,:,:), ttend(:,:,:), lyrnew(:,:)
-    real(8), intent(out) :: tnew(:,:,:)
+    real(RKIND), intent(in) :: dt, tcur(:,:,:), ttend(:,:,:), lyrnew(:,:)
+    real(RKIND), intent(out) :: tnew(:,:,:)
 
     integer :: ic, k
 
@@ -160,15 +170,15 @@ contains
 
   subroutine amb_check_tracers(maxLevelCell, nCells, areaCell, h, q)
     integer, intent(in) :: maxLevelCell(:), nCells
-    real(8), intent(in) :: areaCell(:), h(:,:), q(:,:,:)
+    real(RKIND), intent(in) :: areaCell(:), h(:,:), q(:,:,:)
 
     integer, parameter :: conout = 999
 
-    real(8), save :: overall_maxerr = 0, mass0(ndbgq)
+    real(RKIND), save :: overall_maxerr = 0, mass0(ndbgq)
     integer, save :: consistency_output_cnt = 0
 
     integer :: idx, ic, k, iq, ierr
-    real(8) :: maxerr, mass, send(ndbgq), recv(ndbgq), err
+    real(RKIND) :: maxerr, mass, send(ndbgq), recv(ndbgq), err
 
     if (modulo(timestep-1, 10) == 0) then
        ! Debug tracer 3 mixing ratio is uniformly 42. Check departure from that.

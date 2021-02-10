@@ -1819,7 +1819,7 @@ module ocn_time_integration_split
                                    tracersGroupTend, layerThicknessNew, tracersGroupNew)
                               updated_tracers = .true.
                            end if
-                           !call amb_check_tracers(maxLevelCell, nCells, areaCell, layerThicknessNew, tracersGroupNew)
+                           
                         end if
                         if (.not. updated_tracers) then
                            !$omp parallel
@@ -1833,6 +1833,7 @@ module ocn_time_integration_split
                            !$omp end do
                            !$omp end parallel
                         end if
+                        if (trim(groupItr % memberName) == 'debugTracers') call amb_check_tracers(maxLevelCell, nCells, areaCell, layerThicknessNew, tracersGroupNew)
 
                         ! limit salinity in separate loop
                         if ( trim(groupItr % memberName) == 'activeTracers' ) then

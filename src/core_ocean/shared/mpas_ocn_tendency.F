@@ -493,7 +493,6 @@ contains
       real(RKIND) :: dtuse
       integer :: poolidx
       logical :: active_tracers, zero_surface_flux
-      real (kind=RKIND), dimension(:,:), allocatable, target :: vertAleTransportTopCopy
 
       !
       ! set time level of optional argument is present
@@ -568,9 +567,6 @@ contains
       call mpas_timer_start("ocn_tend_tracer")
 
       allocate(normalThicknessFlux(nVertLevels, nEdges+1))
-      if (amb_use()) then
-         allocate(vertAleTransportTopCopy(size(vertAleTransportTop,1), size(vertAleTransportTop,2)))
-      end if
 
       !
       ! transport velocity for the tracer.
@@ -617,8 +613,7 @@ contains
                      end if
                      if (.not. amb_is_tracer_step()) cycle
                      dtuse = amb_get_supercycle()*dt
-                     call amb_fill(normalThicknessFlux, vertAleTransportTopCopy)
-                     vertAleTransportTop => vertAleTransportTopCopy
+                     call amb_fill(normalThicknessFlux, vertAleTransportTop, layerThickness)
                   end if
                end if
 
@@ -992,9 +987,6 @@ contains
       end do
 
       deallocate(normalThicknessFlux)
-      if (amb_use()) then
-         deallocate(vertAleTransportTopCopy)
-      end if
 
       call mpas_timer_stop("ocn_tend_tracer")
 
