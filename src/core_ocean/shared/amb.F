@@ -14,7 +14,7 @@ module amb
   ! 3 for baro10km with 2hr dt
   ! 2 for baro4km with 1hr dt
   integer :: supercycle
-  logical :: use
+  logical :: sc_use, sc_params
 
   logical :: first = .true.
   integer :: mpirank
@@ -33,8 +33,13 @@ contains
 
   function amb_use() result(u)
     logical :: u
-    u = use
+    u = sc_use
   end function amb_use
+
+  function amb_sc_params() result (u)
+    logical :: u
+    u = sc_params
+  end function amb_sc_params
 
   subroutine amb_set_timestep()
     call amb_init()
@@ -75,6 +80,7 @@ contains
   subroutine amb_init()
     integer :: err
     character (len=255) :: amb_sc
+    integer :: tmp
 
     if (.not. first) return
     first = .false.
@@ -84,15 +90,26 @@ contains
     call mpi_comm_rank(MPI_COMM_WORLD, mpirank, err)
     amroot = mpirank == 0
 
-    use = .false.
+    sc_use = .false.
     supercycle = 1
     call get_environment_variable("amb_sc", amb_sc, status=err)
     if (err /= 1) then
        read(amb_sc, '(i)', iostat=err) supercycle
-       use = supercycle > 0!1
+       sc_use = supercycle > 0!1
+    end if
+    sc_params = sc_use
+    if (sc_use) then
+       call get_environment_variable("amb_sc_params", amb_sc, status=err)
+       if (err /= 1) then
+          read(amb_sc, '(i)', iostat=err) tmp
+          sc_params = tmp /= 0
+       end if
     end if
 
-    if (amroot) print '(a,l,a,i2)', 'amb> init use', use, ' supercycle', supercycle
+    if (amroot) then
+       print '(a,l,a,l,a,i2)', 'amb> init use', sc_use, ' params', sc_params, &
+            ' supercycle', supercycle
+    end if
   end subroutine amb_init
 
   subroutine amb_set_layerThickness0(layerThickness)

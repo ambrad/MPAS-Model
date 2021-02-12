@@ -112,13 +112,15 @@ contains
 !-----------------------------------------------------------------------
 
    subroutine ocn_tracer_ecosys_compute(activeTracers, ecosysTracers, forcingPool, nTracers, nCellsSolve, &
-      latCell, maxLevelCell, nVertLevels, layerThickness, zMid, indexTemperature, indexSalinity, ecosysTracersTend, err)!{{{
+      latCell, maxLevelCell, nVertLevels, layerThickness, zMid, indexTemperature, indexSalinity, ecosysTracersTend, err, dt)!{{{
 
       !-----------------------------------------------------------------
       !
       ! input variables
       !
       !-----------------------------------------------------------------
+
+      real(RKIND), intent(in) :: dt
 
       ! one dimensional arrays
       integer, dimension(:), intent(in) :: &
@@ -131,7 +133,7 @@ contains
          zMid, layerThickness
 
       ! three dimensional arrays
-      real (kind=RKIND), dimension(:,:,:), intent(in) :: &
+      real (kind=RKIND), dimension(:,:,:), intent(inout) :: &
          ecosysTracers
       real (kind=RKIND), dimension(:,:,:), intent(in) :: &
          activeTracers
@@ -349,6 +351,22 @@ contains
 
       integer :: iCell, iLevel, iTracer, numColumns, column, autotroph
 
+      !amb
+      integer :: it, sc, i
+      logical :: subcyc
+      real (RKIND), dimension(:,:), allocatable :: stat0, tend0
+
+      subcyc = .false.
+      sc = 1
+      if (amb_use()) then
+         subcyc = amb_sc_params()
+         if (subcyc) then
+            sc = amb_get_supercycle()
+            allocate(stat0(size(ecosysTracers,1),size(ecosysTracers,2)))
+            allocate(tend0(size(ecosysTracers,1),size(ecosysTracers,2)))
+         end if
+      end if
+
       err = 0
 
       call mpas_timer_start("ecosys source-sink")
@@ -497,6 +515,13 @@ contains
       column = 1
       !DWJ 08/05/2016: This loop needs OpenMP added to it.
       do iCell=1,nCellsSolve
+         if (subcyc) then !amb
+            stat0(:size(ecosysTracers,1),:size(ecosysTracers,2)) = ecosysTracers(:,:,iCell)
+            tend0(:size(ecosysTracers,1),:size(ecosysTracers,2)) = ecosysTracersTend(:,:,iCell)
+         end if
+         do it = 1,sc
+         if (subcyc) ecosysTracersTend(:,:,iCell) = 0
+
          BGC_input%number_of_active_levels(column) = maxLevelCell(iCell)
          BGC_input%cell_latitude(column) = latCell(iCell)
 ! convert dust flux from kg/m2/s to g/cm2/s
@@ -956,7 +981,22 @@ contains
 
          endif  !  config_ecosysTracers_diagnostic_fields_level4
 
+         if (subcyc) then
+            do i = 1, size(ecosysTracers,1)
+               ecosysTracers(i,:,iCell) = ecosysTracers(i,:,iCell) + dt*ecosysTracersTend(i,:,iCell)/layerThickness(:,iCell)
+            end do
+         end if
+         enddo  !  it
+         if (subcyc) then !amb
+            do i = 1, size(ecosysTracers,1)
+               ecosysTracersTend(i,:,iCell) = tend0(i,:size(ecosysTracers,2)) + &
+                 layerThickness(:,iCell)*(ecosysTracers(i,:,iCell) - stat0(i,:size(ecosysTracers,2)))/(sc*dt)
+            end do
+            ecosysTracers(:,:,iCell) = stat0(:size(ecosysTracers,1),:size(ecosysTracers,2))
+         end if
       enddo  !  iCell
+
+      if (subcyc) deallocate(stat0, tend0)
 
       call mpas_timer_stop("ecosys source-sink")
 
