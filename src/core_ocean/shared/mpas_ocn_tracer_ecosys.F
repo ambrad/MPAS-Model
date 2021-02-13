@@ -133,7 +133,7 @@ contains
          zMid, layerThickness
 
       ! three dimensional arrays
-      real (kind=RKIND), dimension(:,:,:), intent(inout) :: &
+      real (kind=RKIND), dimension(:,:,:), intent(in) :: &
          ecosysTracers
       real (kind=RKIND), dimension(:,:,:), intent(in) :: &
          activeTracers
@@ -347,24 +347,18 @@ contains
       ! then convert back to MKS after
       real (kind=RKIND) :: convertLengthMKStoCGS = 100.0_RKIND
       real (kind=RKIND) :: convertLengthCGStoMKS = 0.01_RKIND
-      real (kind=RKIND) :: zTop, zBot
 
-      integer :: iCell, iLevel, iTracer, numColumns, column, autotroph
+      integer :: iCell, numColumns, column
 
       !amb
-      integer :: it, sc, i
-      logical :: subcyc
-      real (RKIND), dimension(:,:), allocatable :: stat0, tend0
+      integer :: supercycle
+      logical :: subcycle
 
-      subcyc = .false.
-      sc = 1
+      subcycle = .false.
+      supercycle = 1
       if (amb_use()) then
-         subcyc = amb_sc_params()
-         if (subcyc) then
-            sc = amb_get_supercycle()
-            allocate(stat0(size(ecosysTracers,1),size(ecosysTracers,2)))
-            allocate(tend0(size(ecosysTracers,1),size(ecosysTracers,2)))
-         end if
+         subcycle = amb_sc_params()
+         if (subcycle) supercycle = amb_get_supercycle()
       end if
 
       err = 0
@@ -513,14 +507,49 @@ contains
 
       numColumns = 1
       column = 1
-      !DWJ 08/05/2016: This loop needs OpenMP added to it.
-      do iCell=1,nCellsSolve
-         if (subcyc) then !amb
-            stat0 = ecosysTracers(:,:,iCell)
-            tend0 = ecosysTracersTend(:,:,iCell)
-         end if
-         do it = 1,sc
-         if (subcyc) ecosysTracersTend(:,:,iCell) = 0
+      if (subcycle) then
+         do iCell=1,nCellsSolve
+            call subcycle_SourceSink()
+         end do
+      else
+         !DWJ 08/05/2016: This loop needs OpenMP added to it.
+         do iCell=1,nCellsSolve
+            call wrap_SourceSink(ecosysTracers(:,:,iCell))
+         end do
+      end if
+
+      call mpas_timer_stop("ecosys source-sink")
+
+    contains
+
+      subroutine subcycle_SourceSink()
+        real(RKIND), dimension(size(ecosysTracers,1),size(ecosysTracers,2)) :: &
+             stat0, stat, tend0
+        real(RKIND) :: dtsub
+        integer :: it, i
+
+        dtsub = dt/supercycle
+        stat0 = ecosysTracers(:,:,iCell)
+        stat  = stat0
+        tend0 = ecosysTracersTend(:,:,iCell)
+        do it = 1, supercycle
+           ecosysTracersTend(:,:,iCell) = 0
+           call wrap_SourceSink(stat)
+           do i = 1, size(ecosysTracers,1)
+              stat(i,:) = stat(i,:) + &
+                   dtsub*ecosysTracersTend(i,:,iCell)/layerThickness(:,iCell)
+           end do
+        end do
+        do i = 1, size(ecosysTracers,1)
+           ecosysTracersTend(i,:,iCell) = tend0(i,:) + &
+                layerThickness(:,iCell)*(stat(i,:) - stat0(i,:))/dt
+        end do
+      end subroutine subcycle_SourceSink
+
+      subroutine wrap_SourceSink(est)
+         real(RKIND), dimension(size(ecosysTracers,1),size(ecosysTracers,2)), intent(in) :: est
+         real (kind=RKIND) :: zTop, zBot
+         integer :: iLevel, autotroph
 
          BGC_input%number_of_active_levels(column) = maxLevelCell(iCell)
          BGC_input%cell_latitude(column) = latCell(iCell)
@@ -547,65 +576,65 @@ contains
             BGC_forcing%SiO3_CLIM(iLevel,column) = 0.0_RKIND
 
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%po4_ind)         =  &
-               ecosysTracers(ecosysIndices%po4_ind,iLevel,iCell)
+               est(ecosysIndices%po4_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%no3_ind)         =  &
-               ecosysTracers(ecosysIndices%no3_ind,iLevel,iCell)
+               est(ecosysIndices%no3_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%sio3_ind)        =  &
-               ecosysTracers(ecosysIndices%sio3_ind,iLevel,iCell)
+               est(ecosysIndices%sio3_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%nh4_ind)         =  &
-               ecosysTracers(ecosysIndices%nh4_ind,iLevel,iCell)
+               est(ecosysIndices%nh4_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%fe_ind)          =  &
-               ecosysTracers(ecosysIndices%fe_ind,iLevel,iCell)
+               est(ecosysIndices%fe_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%o2_ind)          =  &
-               ecosysTracers(ecosysIndices%o2_ind,iLevel,iCell)
+               est(ecosysIndices%o2_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%dic_ind)         =  &
-               ecosysTracers(ecosysIndices%dic_ind,iLevel,iCell)
+               est(ecosysIndices%dic_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%dic_alt_co2_ind) =  &
-               ecosysTracers(ecosysIndices%dic_alt_co2_ind,iLevel,iCell)
+               est(ecosysIndices%dic_alt_co2_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%alk_ind)         =  &
-               ecosysTracers(ecosysIndices%alk_ind,iLevel,iCell)
+               est(ecosysIndices%alk_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%doc_ind)         =  &
-               ecosysTracers(ecosysIndices%doc_ind,iLevel,iCell)
+               est(ecosysIndices%doc_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%don_ind)         =  &
-               ecosysTracers(ecosysIndices%don_ind,iLevel,iCell)
+               est(ecosysIndices%don_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%dofe_ind)        =  &
-               ecosysTracers(ecosysIndices%dofe_ind,iLevel,iCell)
+               est(ecosysIndices%dofe_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%dop_ind)         =  &
-               ecosysTracers(ecosysIndices%dop_ind,iLevel,iCell)
+               est(ecosysIndices%dop_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%donr_ind)        =  &
-               ecosysTracers(ecosysIndices%donr_ind,iLevel,iCell)
+               est(ecosysIndices%donr_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%dopr_ind)        =  &
-               ecosysTracers(ecosysIndices%dopr_ind,iLevel,iCell)
+               est(ecosysIndices%dopr_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%zooC_ind)        =  &
-               ecosysTracers(ecosysIndices%zooC_ind,iLevel,iCell)
+               est(ecosysIndices%zooC_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%spC_ind)         =  &
-               ecosysTracers(ecosysIndices%spC_ind,iLevel,iCell)
+               est(ecosysIndices%spC_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%spChl_ind)       =  &
-               ecosysTracers(ecosysIndices%spChl_ind,iLevel,iCell)
+               est(ecosysIndices%spChl_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%spFe_ind)        =  &
-               ecosysTracers(ecosysIndices%spFe_ind,iLevel,iCell)
+               est(ecosysIndices%spFe_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%spCaCO3_ind)     =  &
-               ecosysTracers(ecosysIndices%spCaCO3_ind,iLevel,iCell)
+               est(ecosysIndices%spCaCO3_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%diatC_ind)       =  &
-               ecosysTracers(ecosysIndices%diatC_ind,iLevel,iCell)
+               est(ecosysIndices%diatC_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%diatChl_ind)     =  &
-               ecosysTracers(ecosysIndices%diatChl_ind,iLevel,iCell)
+               est(ecosysIndices%diatChl_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%diatFe_ind)      =  &
-               ecosysTracers(ecosysIndices%diatFe_ind,iLevel,iCell)
+               est(ecosysIndices%diatFe_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%diatSi_ind)      =  &
-               ecosysTracers(ecosysIndices%diatSi_ind,iLevel,iCell)
+               est(ecosysIndices%diatSi_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%phaeoC_ind)      =  &
-               ecosysTracers(ecosysIndices%phaeoC_ind,iLevel,iCell)
+               est(ecosysIndices%phaeoC_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%phaeoChl_ind)    =  &
-               ecosysTracers(ecosysIndices%phaeoChl_ind,iLevel,iCell)
+               est(ecosysIndices%phaeoChl_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%phaeoFe_ind)     =  &
-               ecosysTracers(ecosysIndices%phaeoFe_ind,iLevel,iCell)
+               est(ecosysIndices%phaeoFe_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%diazC_ind)       =  &
-               ecosysTracers(ecosysIndices%diazC_ind,iLevel,iCell)
+               est(ecosysIndices%diazC_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%diazChl_ind)     =  &
-               ecosysTracers(ecosysIndices%diazChl_ind,iLevel,iCell)
+               est(ecosysIndices%diazChl_ind,iLevel)
             BGC_input%BGC_tracers(iLevel,column,BGC_indices%diazFe_ind)      =  &
-               ecosysTracers(ecosysIndices%diazFe_ind,iLevel,iCell)
+               est(ecosysIndices%diazFe_ind,iLevel)
 
          enddo  !  iLevel
 
@@ -980,25 +1009,7 @@ contains
             enddo
 
          endif  !  config_ecosysTracers_diagnostic_fields_level4
-
-         if (subcyc) then
-            do i = 1, size(ecosysTracers,1)
-               ecosysTracers(i,:,iCell) = ecosysTracers(i,:,iCell) + (dt/sc)*ecosysTracersTend(i,:,iCell)/layerThickness(:,iCell)
-            end do
-         end if
-         enddo  !  it
-         if (subcyc) then !amb
-            do i = 1, size(ecosysTracers,1)
-               ecosysTracersTend(i,:,iCell) = tend0(i,:) + &
-                 layerThickness(:,iCell)*(ecosysTracers(i,:,iCell) - stat0(i,:))/dt
-            end do
-            ecosysTracers(:,:,iCell) = stat0(:,:)
-         end if
-      enddo  !  iCell
-
-      if (subcyc) deallocate(stat0, tend0)
-
-      call mpas_timer_stop("ecosys source-sink")
+      end subroutine wrap_SourceSink
 
    !--------------------------------------------------------------------
 
