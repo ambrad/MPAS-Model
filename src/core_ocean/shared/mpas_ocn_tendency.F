@@ -63,6 +63,8 @@ module ocn_tendency
    use ocn_wetting_drying
    use ocn_vel_tidal_potential
 
+   use amb
+
    implicit none
    private
    save
@@ -601,6 +603,12 @@ contains
       !               units: m^{2} s^{-1}
       real (kind=RKIND), dimension(:,:), allocatable :: normalThicknessFlux
 
+      !amb
+      real(RKIND) :: dtuse
+      integer :: poolidx
+      logical :: active_tracers, zero_surface_flux
+      real (kind=RKIND), dimension(:,:), allocatable, target :: vertAleTransportTopCopy
+
       !
       ! set time level of optional argument is present
       !
@@ -674,6 +682,9 @@ contains
       call mpas_timer_start("ocn_tend_tracer")
 
       allocate(normalThicknessFlux(nVertLevels, nEdges+1))
+      if (amb_use()) then
+         allocate(vertAleTransportTopCopy(size(vertAleTransportTop,1), size(vertAleTransportTop,2)))
+      end if
 
       !
       ! transport velocity for the tracer.
@@ -691,7 +702,8 @@ contains
       !
       ! begin iterate over tracer categories
       !
-      call mpas_pool_begin_iteration(tracersPool)
+      call mpas_pool_begin_iteration(tracersPool)     
+      poolidx = 0
       do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
          if ( groupItr % memberType == MPAS_POOL_FIELD ) then
            ! Only compute tendencies for active tracers if activeTracersOnly flag is true.
@@ -700,8 +712,30 @@ contains
             !
             modifiedConfigName = 'config_use_' // trim(groupItr % memberName)
             call mpas_pool_get_config(ocnConfigs, modifiedConfigName, config_use_tracerGroup)
-
+            
             if ( config_use_tracerGroup ) then
+               zero_surface_flux = .true.
+               dtuse = dt
+               if (amb_use()) then
+                  poolidx = poolidx + 1
+                  active_tracers = trim(groupItr%memberName) == 'activeTracers'
+                  if (active_tracers) then
+                     if (poolidx /= 1) print *, 'amb> passive must come after active'
+                     call amb_accum(normalThicknessFlux, vertAleTransportTop)
+                  else
+                     if (trim(groupItr % memberName) == 'ecosysTracers') then
+                        modifiedGroupName = trim(groupItr % memberName) // "SurfaceFlux"
+                        call mpas_pool_get_array(tracersSurfaceFluxPool, trim(modifiedGroupName), tracerGroupSurfaceFlux)
+                        call ocn_tracer_ecosys_surface_flux_accumulate_fluxes(forcingPool, nCellsSolve, tracerGroupSurfaceFlux)
+                        zero_surface_flux = .false.
+                     end if
+                     if (.not. amb_is_tracer_step()) cycle
+                     dtuse = amb_get_supercycle()*dt
+                     call amb_fill(normalThicknessFlux, vertAleTransportTopCopy)
+                     vertAleTransportTop => vertAleTransportTopCopy
+                  end if
+               end if
+
                modifiedConfigName = 'config_use_' // trim(groupItr % memberName) // '_surface_bulk_forcing'
                call mpas_pool_get_config(ocnConfigs, modifiedConfigName, config_use_tracerGroup_surface_bulk_forcing)
                modifiedConfigName = 'config_use_' // trim(groupItr % memberName) // '_surface_restoring'
@@ -744,14 +778,24 @@ contains
                !
                ! initialize tracer surface flux and tendency to zero.
                !
-               !$omp parallel
-               !$omp do schedule(runtime)
-               do iCell = 1, nCells
-                 tracerGroupTend(:,:, iCell) = 0.0_RKIND
-                 tracerGroupSurfaceFlux(:, iCell) = 0.0_RKIND
-               end do
-               !$omp end do
-               !$omp end parallel
+               if (zero_surface_flux) then
+                  !$omp parallel
+                  !$omp do schedule(runtime)
+                  do iCell = 1, nCells
+                     tracerGroupTend(:,:, iCell) = 0.0_RKIND
+                     tracerGroupSurfaceFlux(:, iCell) = 0.0_RKIND
+                  end do
+                  !$omp end do
+                  !$omp end parallel
+               else
+                  !$omp parallel
+                  !$omp do schedule(runtime)
+                  do iCell = 1, nCells
+                     tracerGroupTend(:,:, iCell) = 0.0_RKIND
+                  end do
+                  !$omp end do
+                  !$omp end parallel
+               end if
 
                !
                ! fill components of surface tracer flux
@@ -768,7 +812,7 @@ contains
 
                   call ocn_surface_bulk_forcing_tracers(meshPool, groupItr % memberName, forcingPool, tracerGroup, &
                                                         tracerGroupSurfaceFlux, tracerGroupSurfaceFluxRunoff, &
-                                                        tracerGroupSurfaceFluxRemoved, dt, layerThickness, err)
+                                                        tracerGroupSurfaceFluxRemoved, dtuse, layerThickness, err)
                end if
 
                !
@@ -928,7 +972,7 @@ contains
                ! Tendency for tracer budget is stored within the tracer adv
                ! routine
                call ocn_tracer_advection_tend(tracerGroup, normalThicknessFlux, vertAleTransportTop, layerThickness, &
-                                              dt, meshPool, scratchPool, diagnosticsPool, tracerGroupTend, &
+                                              dtuse, meshPool, scratchPool, diagnosticsPool, tracerGroupTend, &
                                               trim(groupItr % memberName))
 
                !
@@ -949,7 +993,7 @@ contains
                  endif
                endif
                call ocn_tracer_hmix_tend(meshPool, scratchPool, layerThicknessEdge, layerThickness, zMid, tracerGroup, &
-                                         RediKappa, slopeTriadUp, slopeTriadDown, dt, isActiveTracer, &
+                                         RediKappa, slopeTriadUp, slopeTriadDown, dtuse, isActiveTracer, &
                                          RediKappaSfcTaper, RediKappaScaling, rediLimiterCount, tracerGroupTend, err)
 
                if(trim(groupItr % memberName)=='activeTracers') then
@@ -1062,6 +1106,9 @@ contains
       end do
 
       deallocate(normalThicknessFlux)
+      if (amb_use()) then
+         deallocate(vertAleTransportTopCopy)
+      end if
 
       call mpas_timer_stop("ocn_tend_tracer")
 
