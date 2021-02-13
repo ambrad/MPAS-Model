@@ -603,7 +603,7 @@ contains
                   active_tracers = trim(groupItr%memberName) == 'activeTracers'
                   if (active_tracers) then
                      if (poolidx /= 1) print *, 'amb> passive must come after active'
-                     call amb_accum(layerThickness, normalThicknessFlux, vertAleTransportTop)
+                     call amb_accum(layerThickness, zMid, normalThicknessFlux, vertAleTransportTop)
                   else
                      if (trim(groupItr % memberName) == 'ecosysTracers') then
                         modifiedGroupName = trim(groupItr % memberName) // "SurfaceFlux"
@@ -613,7 +613,7 @@ contains
                      end if
                      if (.not. amb_is_tracer_step()) cycle
                      dtuse = amb_get_supercycle()*dt
-                     call amb_fill(layerThickness, normalThicknessFlux, vertAleTransportTop)
+                     call amb_fill(layerThickness, zMid, normalThicknessFlux, vertAleTransportTop)
                   end if
                end if
 
@@ -704,7 +704,7 @@ contains
                   call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracers, timeLevel)
                   call ocn_tracer_ecosys_compute(activeTracers, tracerGroup, forcingPool, nTracerGroup, &
                      nCellsSolve, latCell, maxLevelCell, nVertLevels, layerThickness, zMid, indexTemperature, &
-                     indexSalinity, tracerGroupTend, err, dt)
+                     indexSalinity, tracerGroupTend, err, dtuse)
 
                   call ocn_tracer_ecosys_surface_flux_compute(activeTracers, tracerGroup, forcingPool,  &
                      nTracerGroup, nCellsSolve, zMid, indexTemperature, indexSalinity, tracerGroupSurfaceFlux, err)

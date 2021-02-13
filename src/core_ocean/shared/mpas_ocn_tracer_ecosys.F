@@ -516,8 +516,8 @@ contains
       !DWJ 08/05/2016: This loop needs OpenMP added to it.
       do iCell=1,nCellsSolve
          if (subcyc) then !amb
-            stat0(:size(ecosysTracers,1),:size(ecosysTracers,2)) = ecosysTracers(:,:,iCell)
-            tend0(:size(ecosysTracers,1),:size(ecosysTracers,2)) = ecosysTracersTend(:,:,iCell)
+            stat0 = ecosysTracers(:,:,iCell)
+            tend0 = ecosysTracersTend(:,:,iCell)
          end if
          do it = 1,sc
          if (subcyc) ecosysTracersTend(:,:,iCell) = 0
@@ -983,16 +983,16 @@ contains
 
          if (subcyc) then
             do i = 1, size(ecosysTracers,1)
-               ecosysTracers(i,:,iCell) = ecosysTracers(i,:,iCell) + dt*ecosysTracersTend(i,:,iCell)/layerThickness(:,iCell)
+               ecosysTracers(i,:,iCell) = ecosysTracers(i,:,iCell) + (dt/sc)*ecosysTracersTend(i,:,iCell)/layerThickness(:,iCell)
             end do
          end if
          enddo  !  it
          if (subcyc) then !amb
             do i = 1, size(ecosysTracers,1)
-               ecosysTracersTend(i,:,iCell) = tend0(i,:size(ecosysTracers,2)) + &
-                 layerThickness(:,iCell)*(ecosysTracers(i,:,iCell) - stat0(i,:size(ecosysTracers,2)))/(sc*dt)
+               ecosysTracersTend(i,:,iCell) = tend0(i,:) + &
+                 layerThickness(:,iCell)*(ecosysTracers(i,:,iCell) - stat0(i,:))/dt
             end do
-            ecosysTracers(:,:,iCell) = stat0(:size(ecosysTracers,1),:size(ecosysTracers,2))
+            ecosysTracers(:,:,iCell) = stat0(:,:)
          end if
       enddo  !  iCell
 

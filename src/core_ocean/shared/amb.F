@@ -25,7 +25,7 @@ module amb
   integer :: timestep, split_explicit_step, n_ts_iter
 
   real(RKIND), dimension(:,:), allocatable, target :: &
-       layerThickness0, accumLayerThickness, accumVertAleTransportTop
+       layerThickness0, accumLayerThickness, accumZMid, accumVertAleTransportTop
   real(RKIND), dimension(:,:), allocatable :: &
        accumNormalThicknessFlux
 
@@ -126,15 +126,16 @@ contains
     end if
   end subroutine amb_set_layerThickness0
 
-  subroutine amb_accum(layerThickness, normalThicknessFlux, vertAleTransportTop)
+  subroutine amb_accum(layerThickness, zMid, normalThicknessFlux, vertAleTransportTop)
     real(RKIND), dimension(:,:), intent(in) :: &
-         layerThickness, normalThicknessFlux, vertAleTransportTop
+         layerThickness, zMid, normalThicknessFlux, vertAleTransportTop
 
     if (split_explicit_step /= n_ts_iter) return
 
     if (.not. allocated(accumNormalThicknessFlux)) then
        allocate(accumLayerThickness(size(layerThickness,1), &
                                     size(layerThickness,2)))
+       allocate(accumZMid(size(zMid,1), size(zMid,2)))
        allocate(accumNormalThicknessFlux(size(normalThicknessFlux,1), &
                                          size(normalThicknessFlux,2)))
        allocate(accumVertAleTransportTop(size(vertAleTransportTop,1), &
@@ -145,30 +146,34 @@ contains
     if (modulo(timestep-1, supercycle) == 0) then
        if (amroot .and. verbose > 0) print *,'amb> accum zero'
        accumLayerThickness(:,:) = 0
+       accumZMid(:,:) = 0
        accumNormalThicknessFlux(:,:) = 0
        accumVertAleTransportTop(:,:) = 0
     end if
 
     if (amroot .and. verbose > 0) print *,'amb> accum accum',timestep,split_explicit_step
+    accumZMid = accumZMid + zMid
     accumLayerThickness = accumLayerThickness + layerThickness
     accumNormalThicknessFlux = accumNormalThicknessFlux + normalThicknessFlux
     accumVertAleTransportTop = accumVertAleTransportTop + vertAleTransportTop
 
     if (amb_is_tracer_step()) then
        accumLayerThickness = accumLayerThickness/supercycle
+       accumZMid = accumZMid/supercycle
        accumNormalThicknessFlux = accumNormalThicknessFlux/supercycle
        accumVertAleTransportTop = accumVertAleTransportTop/supercycle
     end if
   end subroutine amb_accum
 
-  subroutine amb_fill(layerThickness, normalThicknessFlux, vertAleTransportTop)
+  subroutine amb_fill(layerThickness, zMid, normalThicknessFlux, vertAleTransportTop)
     real(RKIND), intent(out) :: normalThicknessFlux(:,:)
-    real(RKIND), intent(out), pointer :: vertAleTransportTop(:,:), layerThickness(:,:)
+    real(RKIND), intent(out), dimension(:,:), pointer :: layerThickness, zMid, vertAleTransportTop
 
     if (split_explicit_step /= n_ts_iter) print *, 'amb> amb_fill: should not be here'
 
     if (amroot .and. verbose > 0) print *,'amb> fill',timestep,split_explicit_step
     normalThicknessFlux = accumNormalThicknessFlux
+    zMid => accumZMid
     vertAleTransportTop => accumVertAleTransportTop
     layerThickness => accumLayerThickness
   end subroutine amb_fill
