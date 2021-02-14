@@ -1819,10 +1819,6 @@ module ocn_time_integration_split
                               call amb_update(maxLevelCell, nCells, dt, tracersGroupCur, &
                                    tracersGroupTend, layerThicknessNew, tracersGroupNew)
                               updated_tracers = .true.
-                              if (trim(groupItr % memberName) == 'ecosysTracers') then
-                                 call ocn_tracer_ecosys_sum_tends(tracersGroupTend, nCells, maxLevelCell, areaCell)
-                                 call amb_c_print()
-                              end if
                            end if
                         end if
                         if (.not. updated_tracers) then
@@ -1837,7 +1833,17 @@ module ocn_time_integration_split
                            !$omp end do
                            !$omp end parallel
                         end if
-                        !if (trim(groupItr % memberName) == 'debugTracers') call amb_check_debug_tracers(maxLevelCell, nCells, areaCell, layerThicknessNew, tracersGroupNew)
+                        if (.true.) then
+                           if (trim(groupItr % memberName) == 'debugTracers') then
+                              call amb_check_debug_tracers(maxLevelCell, nCells, areaCell, &
+                                   layerThicknessNew, tracersGroupNew)
+                           end if
+                           if (trim(groupItr % memberName) == 'ecosysTracers') then
+                              call ocn_tracer_ecosys_sum_tends(tracersGroupTend, nCells, &
+                                   maxLevelCell, areaCell)
+                              call amb_c_print()
+                           end if
+                        end if
 
                         ! limit salinity in separate loop
                         if ( trim(groupItr % memberName) == 'activeTracers' ) then
