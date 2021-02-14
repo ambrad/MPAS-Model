@@ -14,10 +14,10 @@ module amb
   ! 3 for baro10km with 2hr dt
   ! 2 for baro4km with 1hr dt
   integer :: supercycle
-  logical :: sc_use, sc_params
+  logical :: sc_use, sc_params, diag_carbon
 
   logical :: first = .true.
-  integer :: mpirank
+  integer :: mpirank, comm_global
   logical :: amroot
 
   integer, parameter :: ndbgq = 3, verbose = 0
@@ -28,6 +28,8 @@ module amb
        layerThickness0, accumLayerThickness, accumZMid, accumVertAleTransportTop
   real(RKIND), dimension(:,:), allocatable :: &
        accumNormalThicknessFlux
+
+  real(RKIND) :: carbon_diags(4)
 
 contains
 
@@ -41,8 +43,9 @@ contains
     u = sc_params
   end function amb_sc_params
 
-  subroutine amb_set_timestep()
-    call amb_init()
+  subroutine amb_set_timestep(comm)
+    integer, intent(in) :: comm
+    call amb_init(comm)
     timestep = timestep + 1
   end subroutine amb_set_timestep
 
@@ -77,38 +80,46 @@ contains
     r = mpirank
   end function amb_get_rank
 
-  subroutine amb_init()
+  subroutine amb_init(comm)
+    integer, intent(in) :: comm
     integer :: err
-    character (len=255) :: amb_sc
+    character (len=255) :: env_str
     integer :: tmp
 
     if (.not. first) return
     first = .false.
 
+    comm_global = comm
     timestep = 0
 
-    call mpi_comm_rank(MPI_COMM_WORLD, mpirank, err)
+    call mpi_comm_rank(comm_global, mpirank, err)
     amroot = mpirank == 0
 
     sc_use = .false.
     supercycle = 1
-    call get_environment_variable("amb_sc", amb_sc, status=err)
+    call get_environment_variable("amb_sc", env_str, status=err)
     if (err /= 1) then
-       read(amb_sc, '(i)', iostat=err) supercycle
-       sc_use = supercycle > 0!1
+       read(env_str, '(i)', iostat=err) supercycle
+       sc_use = supercycle > 1
     end if
     sc_params = sc_use
     if (sc_use) then
-       call get_environment_variable("amb_sc_params", amb_sc, status=err)
+       call get_environment_variable("amb_sc_params", env_str, status=err)
        if (err /= 1) then
-          read(amb_sc, '(i)', iostat=err) tmp
+          read(env_str, '(i)', iostat=err) tmp
           sc_params = tmp /= 0
        end if
     end if
-
+    diag_carbon = .false.
+    call get_environment_variable("amb_diag_carbon", env_str, status=err)
+    if (err /= 1) then
+       read(env_str, '(i)', iostat=err) tmp
+       diag_carbon = tmp /= 0
+    end if
+    
     if (amroot) then
-       print '(a,l,a,l,a,i2)', 'amb> init use', sc_use, ' params', sc_params, &
-            ' supercycle', supercycle
+       print '(a,l,a,l,a,i2,a,l)', 'amb> init use', sc_use, ' params', sc_params, &
+            ' supercycle', supercycle, ' diagC', diag_carbon
     end if
   end subroutine amb_init
 
@@ -198,7 +209,7 @@ contains
     end do
   end subroutine amb_update
 
-  subroutine amb_check_tracers(maxLevelCell, nCells, areaCell, h, q)
+  subroutine amb_check_debug_tracers(maxLevelCell, nCells, areaCell, h, q)
     integer, intent(in) :: maxLevelCell(:), nCells
     real(RKIND), intent(in) :: areaCell(:), h(:,:), q(:,:,:)
 
@@ -238,7 +249,7 @@ contains
           end do
           send(iq) = mass
        end do
-       call mpi_allreduce(send, recv, ndbgq, MPI_REAL8, MPI_SUM, MPI_COMM_WORLD, ierr)
+       call mpi_allreduce(send, recv, ndbgq, MPI_REAL8, MPI_SUM, comm_global, ierr)
        if (amroot) then
           do iq = 1, ndbgq
              mass = recv(iq)
@@ -254,6 +265,38 @@ contains
           end do
        end if
     end if
-  end subroutine amb_check_tracers
+  end subroutine amb_check_debug_tracers
+
+  !!! carbon conservation
+  !   Inputs to reduction routines are already reduced over nCellsSolve w/in
+  ! this rank.
+  !   carbon_diags = (
+  !                   calcToSed + pocToSed
+  !                   surfaceFlux
+  !                   diag_Jint_Ctot)
+
+  function amb_diag_carbon() result (u)
+    logical :: u
+    u = diag_carbon
+  end function amb_diag_carbon
+
+  subroutine amb_c_reduce_ecosys_diags(calc_to_sed, poc_to_sed, diag_Jint_Ctot)
+    real(RKIND), intent(in) :: calc_to_sed, poc_to_sed, diag_Jint_Ctot
+    integer :: ierr
+    real(RKIND) :: send(2), recv(2)
+
+    if (.not. diag_carbon) return
+    send(1) = calc_to_sed + poc_to_sed
+    send(2) = diag_Jint_Ctot
+    call mpi_allreduce(send, recv, 2, MPI_REAL8, MPI_SUM, comm_global, ierr)
+    carbon_diags(2) = recv(1)
+    carbon_diags(4) = recv(2)
+  end subroutine amb_c_reduce_ecosys_diags
+
+  subroutine amb_c_print()
+    if (.not. amroot) return
+    if (.not. diag_carbon) return
+    print '(a,2(es24.16))', 'amb> C', carbon_diags(2), carbon_diags(4)
+  end subroutine amb_c_print
 
 end module amb

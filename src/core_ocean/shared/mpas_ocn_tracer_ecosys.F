@@ -353,6 +353,7 @@ contains
       !amb
       integer :: supercycle
       logical :: subcycle
+      real(RKIND) :: diag_carbon(3)
 
       subcycle = .false.
       supercycle = 1
@@ -507,6 +508,7 @@ contains
 
       numColumns = 1
       column = 1
+      diag_carbon = 0
       if (subcycle) then
          do iCell=1,nCellsSolve
             call subcycle_SourceSink()
@@ -516,6 +518,11 @@ contains
          do iCell=1,nCellsSolve
             call wrap_SourceSink(ecosysTracers(:,:,iCell))
          end do
+      end if
+
+      if (amb_diag_carbon()) then
+         if (subcycle) diag_carbon = diag_carbon/supercycle
+         call amb_c_reduce_ecosys_diags(diag_carbon(1), diag_carbon(2), diag_carbon(3))
       end if
 
       call mpas_timer_stop("ecosys source-sink")
@@ -1009,6 +1016,14 @@ contains
             enddo
 
          endif  !  config_ecosysTracers_diagnostic_fields_level4
+
+         if (amb_diag_carbon()) then
+            do iLevel = 1, maxLevelCell(iCell)
+               diag_carbon(1) = diag_carbon(1) + ecosys_diag_calcToSed(iLevel,iCell)
+               diag_carbon(2) = diag_carbon(2) + ecosys_diag_pocToSed(iLevel,iCell)
+            end do
+            diag_carbon(3) = diag_carbon(3) + ecosys_diag_Jint_Ctot(iCell)
+         end if
       end subroutine wrap_SourceSink
 
    !--------------------------------------------------------------------
