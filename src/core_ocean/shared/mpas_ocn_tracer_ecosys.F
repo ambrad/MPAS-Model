@@ -532,14 +532,14 @@ contains
 
       subroutine subcycle_SourceSink()
         real(RKIND), dimension(size(ecosysTracers,1),size(ecosysTracers,2)) :: &
-             stat0, stat, tend0
+             stat, tend0, tend_accum
         real(RKIND) :: dtsub
         integer :: it, i
 
         dtsub = dt/supercycle
-        stat0 = ecosysTracers(:,:,iCell)
-        stat  = stat0
+        stat = ecosysTracers(:,:,iCell)
         tend0 = ecosysTracersTend(:,:,iCell)
+        tend_accum = 0
         do it = 1, supercycle
            ecosysTracersTend(:,:,iCell) = 0
            call wrap_SourceSink(stat)
@@ -547,11 +547,9 @@ contains
               stat(i,:) = stat(i,:) + &
                    dtsub*ecosysTracersTend(i,:,iCell)/layerThickness(:,iCell)
            end do
+           tend_accum = tend_accum + ecosysTracersTend(:,:,iCell)
         end do
-        do i = 1, size(ecosysTracers,1)
-           ecosysTracersTend(i,:,iCell) = tend0(i,:) + &
-                layerThickness(:,iCell)*(stat(i,:) - stat0(i,:))/dt
-        end do
+        ecosysTracersTend(:,:,iCell) = tend0 + tend_accum/supercycle
       end subroutine subcycle_SourceSink
 
       subroutine wrap_SourceSink(est)
