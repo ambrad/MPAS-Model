@@ -43,6 +43,7 @@ module ocn_time_integration_split
    use ocn_effective_density_in_land_ice
 
    use amb
+   use ocn_tracer_ecosys, only: ocn_tracer_ecosys_sum_tends
    !use act
 
    implicit none
@@ -1819,6 +1820,7 @@ module ocn_time_integration_split
                                    tracersGroupTend, layerThicknessNew, tracersGroupNew)
                               updated_tracers = .true.
                               if (trim(groupItr % memberName) == 'ecosysTracers') then
+                                 call ocn_tracer_ecosys_sum_tends(tracersGroupTend, nCells, maxLevelCell)
                                  call amb_c_print()
                               end if
                            end if

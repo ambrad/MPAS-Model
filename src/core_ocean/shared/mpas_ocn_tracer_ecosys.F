@@ -59,7 +59,8 @@ module ocn_tracer_ecosys
              ocn_tracer_ecosys_surface_flux_compute,  &
              ocn_get_ecosysData,  &
              ocn_ecosys_forcing_write_restart,  &
-             ocn_tracer_ecosys_init
+             ocn_tracer_ecosys_init, &
+             ocn_tracer_ecosys_sum_tends
 
    integer, public:: &
       numColumnsMax
@@ -1297,7 +1298,8 @@ contains
          ecosys_diag_pCO2surface_ALT_CO2,  &
          ecosys_diag_dpCO2_ALT_CO2
 
-
+      !amb
+      real (kind=RKIND) :: rwrk
 
 
       call mpas_timer_start("ecosys surface flux")
@@ -1541,6 +1543,22 @@ contains
          endif
 
       enddo  !  iCell
+
+      if (amb_diag_carbon()) then
+         ! DIC DOC zooC spC diatC diazC phaeoC
+         rwrk = 0
+         do iCell = 1,nCellsSolve
+            rwrk = rwrk + ( &
+                 ecosysSurfaceFlux(ecosysIndices%dic_ind,iCell) + &
+                 ecosysSurfaceFlux(ecosysIndices%doc_ind,iCell) + &
+                 ecosysSurfaceFlux(ecosysIndices%zooC_ind,iCell) + &
+                 ecosysSurfaceFlux(ecosysIndices%spC_ind,iCell) + &
+                 ecosysSurfaceFlux(ecosysIndices%diatC_ind,iCell) + &
+                 ecosysSurfaceFlux(ecosysIndices%diazC_ind,iCell) + &
+                 ecosysSurfaceFlux(ecosysIndices%phaeoC_ind,iCell))
+         end do
+         call amb_c_reduce_ecosys_sfc_fluxes(rwrk)
+      end if
 
       call mpas_timer_stop("ecosys surface flux")
 
@@ -2312,6 +2330,33 @@ contains
       call MPAS_forcing_write_restart_times(forcingGroupHead)
 
     end subroutine ocn_ecosys_forcing_write_restart!}}}
+
+    !amb
+    subroutine ocn_tracer_ecosys_sum_tends(tend, nCellsSolve, maxLevelCell)
+      integer, dimension(:), intent(in) :: maxLevelCell
+      real (kind=RKIND), dimension(:,:,:), intent(in) :: tend
+      integer, intent(in) :: nCellsSolve
+
+      integer :: ic, il
+      real(RKIND) :: tot
+
+      if (.not. amb_diag_carbon()) return
+      tot = 0
+      do ic = 1, nCellsSolve
+         do il = 1, maxLevelCell(ic)
+            tot = tot + ( &
+                 tend(BGC_indices%dic_ind,il,ic) + &
+                 tend(BGC_indices%doc_ind,il,ic) + &
+                 tend(BGC_indices%zooC_ind,il,ic) + &
+                 tend(BGC_indices%spC_ind,il,ic) + &
+                 tend(BGC_indices%diatC_ind,il,ic) + &
+                 tend(BGC_indices%diazC_ind,il,ic) + &
+                 tend(BGC_indices%phaeoC_ind,il,ic) + &
+                 tend(BGC_indices%spCaCO3_ind,il,ic))
+         end do
+      end do
+      call amb_c_reduce_ecosys_tends(tot)
+    end subroutine ocn_tracer_ecosys_sum_tends
 
 end module ocn_tracer_ecosys
 

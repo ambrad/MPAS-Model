@@ -270,7 +270,7 @@ contains
   !!! carbon conservation
   !   Inputs to reduction routines are already reduced over nCellsSolve w/in
   ! this rank.
-  !   carbon_diags = (
+  !   carbon_diags = (tendencies
   !                   calcToSed + pocToSed
   !                   surfaceFlux
   !                   diag_Jint_Ctot)
@@ -279,6 +279,22 @@ contains
     logical :: u
     u = diag_carbon
   end function amb_diag_carbon
+
+  subroutine amb_c_reduce_ecosys_tends(tot)
+    real(RKIND), intent(in) :: tot
+    integer :: ierr
+
+    if (.not. diag_carbon) return
+    call mpi_allreduce(tot, carbon_diags(1), 1, MPI_REAL8, MPI_SUM, comm_global, ierr)
+  end subroutine amb_c_reduce_ecosys_tends
+
+  subroutine amb_c_reduce_ecosys_sfc_fluxes(tot)
+    real(RKIND), intent(in) :: tot
+    integer :: ierr
+
+    if (.not. diag_carbon) return
+    call mpi_allreduce(tot, carbon_diags(3), 1, MPI_REAL8, MPI_SUM, comm_global, ierr)
+  end subroutine amb_c_reduce_ecosys_sfc_fluxes
 
   subroutine amb_c_reduce_ecosys_diags(calc_to_sed, poc_to_sed, diag_Jint_Ctot)
     real(RKIND), intent(in) :: calc_to_sed, poc_to_sed, diag_Jint_Ctot
@@ -296,7 +312,8 @@ contains
   subroutine amb_c_print()
     if (.not. amroot) return
     if (.not. diag_carbon) return
-    print '(a,2(es24.16))', 'amb> C', carbon_diags(2), carbon_diags(4)
+    print '(a,5(es11.3))', 'amb> C', carbon_diags(1:4), &
+         carbon_diags(1) + carbon_diags(2) - carbon_diags(3) + carbon_diags(4)
   end subroutine amb_c_print
 
 end module amb
