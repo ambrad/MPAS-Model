@@ -113,7 +113,7 @@ contains
 !-----------------------------------------------------------------------
 
    subroutine ocn_tracer_ecosys_compute(activeTracers, ecosysTracers, forcingPool, nTracers, nCellsSolve, &
-      latCell, maxLevelCell, nVertLevels, layerThickness, zMid, indexTemperature, indexSalinity, ecosysTracersTend, err, dt)!{{{
+      latCell, maxLevelCell, nVertLevels, layerThickness, zMid, indexTemperature, indexSalinity, ecosysTracersTend, err, dt, areaCell)!{{{
 
       !-----------------------------------------------------------------
       !
@@ -127,7 +127,7 @@ contains
       integer, dimension(:), intent(in) :: &
          maxLevelCell
       real (kind=RKIND), dimension(:), intent(in) :: &
-         latCell
+         latCell, areaCell
 
       ! two dimensional arrays
       real (kind=RKIND), dimension(:,:), intent(in) :: &
@@ -1020,10 +1020,10 @@ contains
 
          if (amb_diag_carbon()) then
             do iLevel = 1, maxLevelCell(iCell)
-               diag_carbon(1) = diag_carbon(1) + ecosys_diag_calcToSed(iLevel,iCell)
-               diag_carbon(2) = diag_carbon(2) + ecosys_diag_pocToSed(iLevel,iCell)
+               diag_carbon(1) = diag_carbon(1) + areaCell(iCell)*ecosys_diag_calcToSed(iLevel,iCell)
+               diag_carbon(2) = diag_carbon(2) + areaCell(iCell)*ecosys_diag_pocToSed(iLevel,iCell)
             end do
-            diag_carbon(3) = diag_carbon(3) + ecosys_diag_Jint_Ctot(iCell)
+            diag_carbon(3) = diag_carbon(3) + areaCell(iCell)*ecosys_diag_Jint_Ctot(iCell)
          end if
       end subroutine wrap_SourceSink
 
@@ -1176,13 +1176,16 @@ contains
 !-----------------------------------------------------------------------
 
    subroutine ocn_tracer_ecosys_surface_flux_compute(activeTracers, ecosysTracers, forcingPool,  &
-      nTracers, nCellsSolve, zMid, indexTemperature, indexSalinity, ecosysSurfaceFlux, err)!{{{
+      nTracers, nCellsSolve, zMid, indexTemperature, indexSalinity, ecosysSurfaceFlux, err, areaCell)!{{{
 
       !-----------------------------------------------------------------
       !
       ! input variables
       !
       !-----------------------------------------------------------------
+
+     real (kind=RKIND), dimension(:), intent(in) :: &
+          areaCell
 
       ! two dimensional arrays
       real (kind=RKIND), dimension(:,:), intent(in) :: &
@@ -1548,7 +1551,7 @@ contains
          ! DIC DOC zooC spC diatC diazC phaeoC
          rwrk = 0
          do iCell = 1,nCellsSolve
-            rwrk = rwrk + ( &
+            rwrk = rwrk + areaCell(iCell)*( &
                  ecosysSurfaceFlux(ecosysIndices%dic_ind,iCell) + &
                  ecosysSurfaceFlux(ecosysIndices%doc_ind,iCell) + &
                  ecosysSurfaceFlux(ecosysIndices%zooC_ind,iCell) + &
@@ -2332,9 +2335,10 @@ contains
     end subroutine ocn_ecosys_forcing_write_restart!}}}
 
     !amb
-    subroutine ocn_tracer_ecosys_sum_tends(tend, nCellsSolve, maxLevelCell)
+    subroutine ocn_tracer_ecosys_sum_tends(tend, nCellsSolve, maxLevelCell, areaCell)
       integer, dimension(:), intent(in) :: maxLevelCell
       real (kind=RKIND), dimension(:,:,:), intent(in) :: tend
+      real (kind=RKIND), dimension(:), intent(in) :: areaCell
       integer, intent(in) :: nCellsSolve
 
       integer :: ic, il
@@ -2344,7 +2348,7 @@ contains
       tot = 0
       do ic = 1, nCellsSolve
          do il = 1, maxLevelCell(ic)
-            tot = tot + ( &
+            tot = tot + areaCell(ic)*( &
                  tend(BGC_indices%dic_ind,il,ic) + &
                  tend(BGC_indices%doc_ind,il,ic) + &
                  tend(BGC_indices%zooC_ind,il,ic) + &

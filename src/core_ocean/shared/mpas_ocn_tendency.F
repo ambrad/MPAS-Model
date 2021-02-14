@@ -493,6 +493,7 @@ contains
       real(RKIND) :: dtuse
       integer :: poolidx
       logical :: active_tracers, zero_surface_flux
+      real (kind=RKIND), dimension(:), pointer :: areaCell
 
       !
       ! set time level of optional argument is present
@@ -561,6 +562,8 @@ contains
          call mpas_pool_get_array(diagnosticsPool,'activeTracerNonLocalTendency',activeTracerNonLocalTendency)
          call mpas_pool_get_array(diagnosticsPool,'activeTracerHorMixTendency',activeTracerHorMixTendency)
       endif
+
+      if (amb_diag_carbon()) call mpas_pool_get_array(meshPool, 'areaCell', areaCell)
 
       if(config_disable_tr_all_tend) return
 
@@ -704,10 +707,10 @@ contains
                   call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracers, timeLevel)
                   call ocn_tracer_ecosys_compute(activeTracers, tracerGroup, forcingPool, nTracerGroup, &
                      nCellsSolve, latCell, maxLevelCell, nVertLevels, layerThickness, zMid, indexTemperature, &
-                     indexSalinity, tracerGroupTend, err, dtuse)
+                     indexSalinity, tracerGroupTend, err, dtuse, areaCell)
 
                   call ocn_tracer_ecosys_surface_flux_compute(activeTracers, tracerGroup, forcingPool,  &
-                     nTracerGroup, nCellsSolve, zMid, indexTemperature, indexSalinity, tracerGroupSurfaceFlux, err)
+                     nTracerGroup, nCellsSolve, zMid, indexTemperature, indexSalinity, tracerGroupSurfaceFlux, err, areaCell)
                endif
 
                !

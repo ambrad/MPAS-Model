@@ -100,7 +100,7 @@ contains
     call get_environment_variable("amb_sc", env_str, status=err)
     if (err /= 1) then
        read(env_str, '(i)', iostat=err) supercycle
-       sc_use = supercycle > 1
+       sc_use = supercycle > 0!1
     end if
     sc_params = sc_use
     if (sc_use) then

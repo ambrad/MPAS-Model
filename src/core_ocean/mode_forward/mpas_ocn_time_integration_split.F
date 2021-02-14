@@ -1820,7 +1820,7 @@ module ocn_time_integration_split
                                    tracersGroupTend, layerThicknessNew, tracersGroupNew)
                               updated_tracers = .true.
                               if (trim(groupItr % memberName) == 'ecosysTracers') then
-                                 call ocn_tracer_ecosys_sum_tends(tracersGroupTend, nCells, maxLevelCell)
+                                 call ocn_tracer_ecosys_sum_tends(tracersGroupTend, nCells, maxLevelCell, areaCell)
                                  call amb_c_print()
                               end if
                            end if
