@@ -1835,12 +1835,12 @@ module ocn_time_integration_split
                         end if
                         if (.true.) then
                            if (trim(groupItr % memberName) == 'debugTracers') then
-                              call amb_check_debug_tracers(maxLevelCell, nCells, areaCell, &
-                                   layerThicknessNew, tracersGroupNew)
+                              call amb_check_debug_tracers(maxLevelCell, nCellsArray(1), &
+                                   areaCell, layerThicknessNew, tracersGroupNew)
                            end if
                            if (trim(groupItr % memberName) == 'ecosysTracers') then
-                              call ocn_tracer_ecosys_sum_tends(tracersGroupTend, nCells, &
-                                   maxLevelCell, areaCell)
+                              call ocn_tracer_ecosys_sum_tends(tracersGroupTend, &
+                                   nCellsArray(1), maxLevelCell, areaCell)
                               call amb_c_print()
                            end if
                         end if
