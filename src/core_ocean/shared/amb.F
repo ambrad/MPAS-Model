@@ -216,15 +216,17 @@ contains
 
   subroutine amb_check_debug_tracers(maxLevelCell, nCells, areaCell, h, q)
     integer, intent(in) :: maxLevelCell(:), nCells
-    real(RKIND), intent(in) :: areaCell(:), h(:,:), q(:,:,:)
+    real(RKIND), intent(in) :: areaCell(:), q(:,:,:)
+    real(RKIND), intent(in), target :: h(:,:)
 
     integer, parameter :: conout = 999
 
     real(RKIND), save :: overall_maxerr = 0, mass0(ndbgq)
-    integer, save :: consistency_output_cnt = 0
+    integer, save :: consistency_output_cnt = 0, next_timestep = 1
 
     integer :: idx, ic, k, iq, ierr
     real(RKIND) :: maxerr, mass, send(ndbgq), recv(ndbgq), err
+    real(RKIND), pointer :: huse(:,:)
 
     if (modulo(timestep-1, 10) == 0) then
        ! Debug tracer 3 mixing ratio is uniformly 42. Check departure from that.
@@ -244,12 +246,17 @@ contains
        overall_maxerr = max(overall_maxerr, maxerr)
     end if
 
-    if (modulo(timestep-1, 50) == 0) then
+    if (timestep == next_timestep) then
+       if (timestep == 1) then
+          huse => layerThickness0
+       else
+          huse => h
+       end if
        do iq = 1, ndbgq
           mass = 0
           do ic = 1, nCells
              do k = 1, maxLevelCell(ic)
-                mass = mass + areaCell(ic)*h(k,ic)*q(iq,k,ic)
+                mass = mass + areaCell(ic)*huse(k,ic)*q(iq,k,ic)
              end do
           end do
           send(iq) = mass
@@ -269,6 +276,10 @@ contains
              end if
           end do
        end if
+       next_timestep = timestep + 50
+       do while (supercycle > 0 .and. modulo(next_timestep, supercycle) /= 0)
+          next_timestep = next_timestep + 1
+       end do
     end if
   end subroutine amb_check_debug_tracers
 
