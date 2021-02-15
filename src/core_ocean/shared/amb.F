@@ -118,7 +118,7 @@ contains
     end if
     
     if (amroot) then
-       print '(a,l,a,l,a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
+       print '(a,l,a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
             ' subc params', subc_params, ' sc', supercycle, ' diagC', diag_carbon
     end if
   end subroutine amb_init
