@@ -352,7 +352,7 @@ contains
       integer :: iCell, numColumns, column
 
       !amb
-      integer :: supercycle
+      integer :: supercycle, il
       logical :: subcycle
       real(RKIND) :: diag_carbon(3)
 
@@ -509,7 +509,6 @@ contains
 
       numColumns = 1
       column = 1
-      diag_carbon = 0
       if (subcycle) then
          do iCell=1,nCellsSolve
             call subcycle_SourceSink()
@@ -517,12 +516,19 @@ contains
       else
          !DWJ 08/05/2016: This loop needs OpenMP added to it.
          do iCell=1,nCellsSolve
-            call wrap_SourceSink(ecosysTracers(:,:,iCell))
+            call wrap_SourceSink(ecosysTracers(:,:,iCell), 0.0_RKIND, 1.0_RKIND)
          end do
       end if
 
       if (amb_diag_carbon()) then
-         if (subcycle) diag_carbon = diag_carbon/supercycle
+         diag_carbon = 0
+         do iCell = 1, nCellsSolve
+            do il = 1, maxLevelCell(iCell)
+               diag_carbon(1) = diag_carbon(1) + areaCell(iCell)*ecosys_diag_calcToSed(il,iCell)
+               diag_carbon(2) = diag_carbon(2) + areaCell(iCell)*ecosys_diag_pocToSed(il,iCell)
+            end do
+            diag_carbon(3) = diag_carbon(3) + areaCell(iCell)*ecosys_diag_Jint_Ctot(iCell)
+         end do
          call amb_c_reduce_ecosys_diags(diag_carbon(1), diag_carbon(2), diag_carbon(3))
       end if
 
@@ -533,27 +539,31 @@ contains
       subroutine subcycle_SourceSink()
         real(RKIND), dimension(size(ecosysTracers,1),size(ecosysTracers,2)) :: &
              stat, tend0, tend_accum
-        real(RKIND) :: dtsub
+        real(RKIND) :: dtsub, c_init, c_accum
         integer :: it, i
 
         dtsub = dt/supercycle
         stat = ecosysTracers(:,:,iCell)
         tend0 = ecosysTracersTend(:,:,iCell)
         tend_accum = 0
+        c_init = 0
+        c_accum = 1.0_RKIND/supercycle
         do it = 1, supercycle
            ecosysTracersTend(:,:,iCell) = 0
-           call wrap_SourceSink(stat)
+           call wrap_SourceSink(stat, c_init, c_accum)
            do i = 1, size(ecosysTracers,1)
               stat(i,:) = stat(i,:) + &
                    dtsub*ecosysTracersTend(i,:,iCell)/layerThickness(:,iCell)
            end do
            tend_accum = tend_accum + ecosysTracersTend(:,:,iCell)
+           c_init = 1
         end do
         ecosysTracersTend(:,:,iCell) = tend0 + tend_accum/supercycle
       end subroutine subcycle_SourceSink
 
-      subroutine wrap_SourceSink(est)
+      subroutine wrap_SourceSink(est, c_init, c_accum)
          real(RKIND), dimension(size(ecosysTracers,1),size(ecosysTracers,2)), intent(in) :: est
+         real(RKIND), intent(in) :: c_init, c_accum
          real (kind=RKIND) :: zTop, zBot
          integer :: iLevel, autotroph
 
@@ -749,90 +759,90 @@ contains
             !
 
             if (config_ecosysTracers_diagnostic_fields_level1) then
-               ecosys_diag_PAR_avg(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_PAR_avg(iLevel,column)
-               ecosys_diag_POC_FLUX_IN(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_POC_FLUX_IN(iLevel,column)*convertLengthCGStoMKS
-               ecosys_diag_CaCO3_FLUX_IN(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_CaCO3_FLUX_IN(iLevel,column)*convertLengthCGStoMKS
-               ecosys_diag_auto_graze_TOT(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_auto_graze_TOT(iLevel,column)
-               ecosys_diag_zoo_loss(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_zoo_loss(iLevel,column)
-               ecosys_diag_photoC_TOT(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_photoC_TOT(iLevel,column)
-               ecosys_diag_photoC_NO3_TOT(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_photoC_NO3_TOT(iLevel,column)
-               ecosys_diag_NITRIF(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_NITRIF(iLevel,column)
-               ecosys_diag_DENITRIF(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DENITRIF(iLevel,column)
-               ecosys_diag_calcToSed(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_calcToSed(iLevel,column)*convertLengthCGStoMKS
-               ecosys_diag_pocToSed(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_pocToSed(iLevel,column)*convertLengthCGStoMKS
-               ecosys_diag_pfeToSed(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_pfeToSed(iLevel,column)*convertLengthCGStoMKS
-               ecosys_diag_SedDenitrif(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_SedDenitrif(iLevel,column)*convertLengthCGStoMKS
-               ecosys_diag_tot_Nfix(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_tot_Nfix(iLevel,column)
+               ecosys_diag_PAR_avg(iLevel,iCell) = c_init*ecosys_diag_PAR_avg(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_PAR_avg(iLevel,column)
+               ecosys_diag_POC_FLUX_IN(iLevel,iCell) = c_init*ecosys_diag_POC_FLUX_IN(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_POC_FLUX_IN(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_CaCO3_FLUX_IN(iLevel,iCell) = c_init*ecosys_diag_CaCO3_FLUX_IN(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_CaCO3_FLUX_IN(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_auto_graze_TOT(iLevel,iCell) = c_init*ecosys_diag_auto_graze_TOT(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_auto_graze_TOT(iLevel,column)
+               ecosys_diag_zoo_loss(iLevel,iCell) = c_init*ecosys_diag_zoo_loss(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_zoo_loss(iLevel,column)
+               ecosys_diag_photoC_TOT(iLevel,iCell) = c_init*ecosys_diag_photoC_TOT(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_photoC_TOT(iLevel,column)
+               ecosys_diag_photoC_NO3_TOT(iLevel,iCell) = c_init*ecosys_diag_photoC_NO3_TOT(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_photoC_NO3_TOT(iLevel,column)
+               ecosys_diag_NITRIF(iLevel,iCell) = c_init*ecosys_diag_NITRIF(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_NITRIF(iLevel,column)
+               ecosys_diag_DENITRIF(iLevel,iCell) = c_init*ecosys_diag_DENITRIF(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DENITRIF(iLevel,column)
+               ecosys_diag_calcToSed(iLevel,iCell) = c_init*ecosys_diag_calcToSed(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_calcToSed(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_pocToSed(iLevel,iCell) = c_init*ecosys_diag_pocToSed(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_pocToSed(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_pfeToSed(iLevel,iCell) = c_init*ecosys_diag_pfeToSed(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_pfeToSed(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_SedDenitrif(iLevel,iCell) = c_init*ecosys_diag_SedDenitrif(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_SedDenitrif(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_tot_Nfix(iLevel,iCell) = c_init*ecosys_diag_tot_Nfix(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_tot_Nfix(iLevel,column)
             endif  !  config_ecosysTracers_diagnostic_fields_level1
 
             !
             ! level 2 diagnostics
             !
             if (config_ecosysTracers_diagnostic_fields_level2) then
-               ecosys_diag_O2_PRODUCTION(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_O2_PRODUCTION(iLevel,column)
-               ecosys_diag_O2_CONSUMPTION(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_O2_CONSUMPTION(iLevel,column)
-               ecosys_diag_AOU(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_AOU(iLevel,column)
-               ecosys_diag_pH_3D(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_pH_3D(iLevel,column)
-               ecosys_diag_POC_PROD(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_POC_PROD(iLevel,column)
-               ecosys_diag_POC_REMIN(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_POC_REMIN(iLevel,column)
+               ecosys_diag_O2_PRODUCTION(iLevel,iCell) = c_init*ecosys_diag_O2_PRODUCTION(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_O2_PRODUCTION(iLevel,column)
+               ecosys_diag_O2_CONSUMPTION(iLevel,iCell) = c_init*ecosys_diag_O2_CONSUMPTION(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_O2_CONSUMPTION(iLevel,column)
+               ecosys_diag_AOU(iLevel,iCell) = c_init*ecosys_diag_AOU(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_AOU(iLevel,column)
+               ecosys_diag_pH_3D(iLevel,iCell) = c_init*ecosys_diag_pH_3D(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_pH_3D(iLevel,column)
+               ecosys_diag_POC_PROD(iLevel,iCell) = c_init*ecosys_diag_POC_PROD(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_POC_PROD(iLevel,column)
+               ecosys_diag_POC_REMIN(iLevel,iCell) = c_init*ecosys_diag_POC_REMIN(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_POC_REMIN(iLevel,column)
 !maltrud NOT SAVED IN BGC_mod YET
-!              ecosys_diag_POC_ACCUM(iLevel,iCell) =  &
-!                          BGC_diagnostic_fields%diag_POC_ACCUM(iLevel,column)
+!              ecosys_diag_POC_ACCUM(iLevel,iCell) = c_init*ecosys_diag_POC_ACCUM(iLevel,iCell) + &
+!                          c_accum*BGC_diagnostic_fields%diag_POC_ACCUM(iLevel,column)
                ecosys_diag_POC_ACCUM(iLevel,iCell) = 0.0_RKIND
 
                do autotroph = 1, autotroph_cnt
-                  ecosys_diag_N_lim(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_N_lim(iLevel,column,autotroph)
-                  ecosys_diag_P_lim(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_P_lim(iLevel,column,autotroph)
-                  ecosys_diag_Fe_lim(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_Fe_lim(iLevel,column,autotroph)
-                  ecosys_diag_SiO3_lim(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_SiO3_lim(iLevel,column,autotroph)
-                  ecosys_diag_light_lim(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_light_lim(iLevel,column,autotroph)
-                  ecosys_diag_photoC(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_photoC(iLevel,column,autotroph)
-                  ecosys_diag_photoC_NO3(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_photoC_NO3(iLevel,column,autotroph)
-                  ecosys_diag_photoFe(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_photoFe(iLevel,column,autotroph)
-                  ecosys_diag_photoNO3(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_photoNO3(iLevel,column,autotroph)
-                  ecosys_diag_photoNH4(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_photoNH4(iLevel,column,autotroph)
-                  ecosys_diag_DOP_uptake(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DOP_uptake(iLevel,column,autotroph)
-                  ecosys_diag_PO4_uptake(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_PO4_uptake(iLevel,column,autotroph)
-                  ecosys_diag_auto_graze(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_auto_graze(iLevel,column,autotroph)
-                  ecosys_diag_auto_loss(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_auto_loss(iLevel,column,autotroph)
-                  ecosys_diag_auto_agg(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_auto_agg(iLevel,column,autotroph)
-                  ecosys_diag_Nfix(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_Nfix(iLevel,column,autotroph)
+                  ecosys_diag_N_lim(autotroph,iLevel,iCell) = c_init*ecosys_diag_N_lim(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_N_lim(iLevel,column,autotroph)
+                  ecosys_diag_P_lim(autotroph,iLevel,iCell) = c_init*ecosys_diag_P_lim(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_P_lim(iLevel,column,autotroph)
+                  ecosys_diag_Fe_lim(autotroph,iLevel,iCell) = c_init*ecosys_diag_Fe_lim(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_Fe_lim(iLevel,column,autotroph)
+                  ecosys_diag_SiO3_lim(autotroph,iLevel,iCell) = c_init*ecosys_diag_SiO3_lim(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_SiO3_lim(iLevel,column,autotroph)
+                  ecosys_diag_light_lim(autotroph,iLevel,iCell) = c_init*ecosys_diag_light_lim(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_light_lim(iLevel,column,autotroph)
+                  ecosys_diag_photoC(autotroph,iLevel,iCell) = c_init*ecosys_diag_photoC(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_photoC(iLevel,column,autotroph)
+                  ecosys_diag_photoC_NO3(autotroph,iLevel,iCell) = c_init*ecosys_diag_photoC_NO3(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_photoC_NO3(iLevel,column,autotroph)
+                  ecosys_diag_photoFe(autotroph,iLevel,iCell) = c_init*ecosys_diag_photoFe(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_photoFe(iLevel,column,autotroph)
+                  ecosys_diag_photoNO3(autotroph,iLevel,iCell) = c_init*ecosys_diag_photoNO3(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_photoNO3(iLevel,column,autotroph)
+                  ecosys_diag_photoNH4(autotroph,iLevel,iCell) = c_init*ecosys_diag_photoNH4(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_photoNH4(iLevel,column,autotroph)
+                  ecosys_diag_DOP_uptake(autotroph,iLevel,iCell) = c_init*ecosys_diag_DOP_uptake(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DOP_uptake(iLevel,column,autotroph)
+                  ecosys_diag_PO4_uptake(autotroph,iLevel,iCell) = c_init*ecosys_diag_PO4_uptake(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_PO4_uptake(iLevel,column,autotroph)
+                  ecosys_diag_auto_graze(autotroph,iLevel,iCell) = c_init*ecosys_diag_auto_graze(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_auto_graze(iLevel,column,autotroph)
+                  ecosys_diag_auto_loss(autotroph,iLevel,iCell) = c_init*ecosys_diag_auto_loss(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_auto_loss(iLevel,column,autotroph)
+                  ecosys_diag_auto_agg(autotroph,iLevel,iCell) = c_init*ecosys_diag_auto_agg(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_auto_agg(iLevel,column,autotroph)
+                  ecosys_diag_Nfix(autotroph,iLevel,iCell) = c_init*ecosys_diag_Nfix(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_Nfix(iLevel,column,autotroph)
                enddo  !  autotroph loop
 
             endif  !  config_ecosysTracers_diagnostic_fields_level2
@@ -841,61 +851,61 @@ contains
             ! level 3 diagnostics
             !
             if (config_ecosysTracers_diagnostic_fields_level3) then
-               ecosys_diag_SiO2_FLUX_IN(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_SiO2_FLUX_IN(iLevel,column)*convertLengthCGStoMKS
-               ecosys_diag_SiO2_PROD(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_SiO2_PROD(iLevel,column)
-               ecosys_diag_SiO2_REMIN(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_SiO2_REMIN(iLevel,column)
-               ecosys_diag_dust_FLUX_IN(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_dust_FLUX_IN(iLevel,column)
-               ecosys_diag_dust_REMIN(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_dust_REMIN(iLevel,column)
-               ecosys_diag_P_iron_FLUX_IN(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_P_iron_FLUX_IN(iLevel,column)*convertLengthCGStoMKS
-               ecosys_diag_P_iron_PROD(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_P_iron_PROD(iLevel,column)
-               ecosys_diag_P_iron_REMIN(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_P_iron_REMIN(iLevel,column)
-               ecosys_diag_DOC_prod(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DOC_prod(iLevel,column)
-               ecosys_diag_DOC_remin(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DOC_remin(iLevel,column)
-               ecosys_diag_DON_prod(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DON_prod(iLevel,column)
-               ecosys_diag_DON_remin(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DON_remin(iLevel,column)
-               ecosys_diag_DOP_prod(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DOP_prod(iLevel,column)
-               ecosys_diag_DOP_remin(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DOP_remin(iLevel,column)
-               ecosys_diag_DOFe_prod(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DOFe_prod(iLevel,column)
-               ecosys_diag_DOFe_remin(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DOFe_remin(iLevel,column)
-               ecosys_diag_Fe_scavenge(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_Fe_scavenge(iLevel,column)
-               ecosys_diag_Fe_scavenge_rate(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_Fe_scavenge_rate(iLevel,column)
-               ecosys_diag_DONr_remin(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DONr_remin(iLevel,column)
-               ecosys_diag_DOPr_remin(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_DOPr_remin(iLevel,column)
-               ecosys_diag_ponToSed(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_ponToSed(iLevel,column)*convertLengthCGStoMKS
-               ecosys_diag_popToSed(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_popToSed(iLevel,column)*convertLengthCGStoMKS
-               ecosys_diag_bsiToSed(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_bsiToSed(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_SiO2_FLUX_IN(iLevel,iCell) = c_init*ecosys_diag_SiO2_FLUX_IN(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_SiO2_FLUX_IN(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_SiO2_PROD(iLevel,iCell) = c_init*ecosys_diag_SiO2_PROD(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_SiO2_PROD(iLevel,column)
+               ecosys_diag_SiO2_REMIN(iLevel,iCell) = c_init*ecosys_diag_SiO2_REMIN(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_SiO2_REMIN(iLevel,column)
+               ecosys_diag_dust_FLUX_IN(iLevel,iCell) = c_init*ecosys_diag_dust_FLUX_IN(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_dust_FLUX_IN(iLevel,column)
+               ecosys_diag_dust_REMIN(iLevel,iCell) = c_init*ecosys_diag_dust_REMIN(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_dust_REMIN(iLevel,column)
+               ecosys_diag_P_iron_FLUX_IN(iLevel,iCell) = c_init*ecosys_diag_P_iron_FLUX_IN(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_P_iron_FLUX_IN(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_P_iron_PROD(iLevel,iCell) = c_init*ecosys_diag_P_iron_PROD(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_P_iron_PROD(iLevel,column)
+               ecosys_diag_P_iron_REMIN(iLevel,iCell) = c_init*ecosys_diag_P_iron_REMIN(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_P_iron_REMIN(iLevel,column)
+               ecosys_diag_DOC_prod(iLevel,iCell) = c_init*ecosys_diag_DOC_prod(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DOC_prod(iLevel,column)
+               ecosys_diag_DOC_remin(iLevel,iCell) = c_init*ecosys_diag_DOC_remin(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DOC_remin(iLevel,column)
+               ecosys_diag_DON_prod(iLevel,iCell) = c_init*ecosys_diag_DON_prod(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DON_prod(iLevel,column)
+               ecosys_diag_DON_remin(iLevel,iCell) = c_init*ecosys_diag_DON_remin(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DON_remin(iLevel,column)
+               ecosys_diag_DOP_prod(iLevel,iCell) = c_init*ecosys_diag_DOP_prod(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DOP_prod(iLevel,column)
+               ecosys_diag_DOP_remin(iLevel,iCell) = c_init*ecosys_diag_DOP_remin(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DOP_remin(iLevel,column)
+               ecosys_diag_DOFe_prod(iLevel,iCell) = c_init*ecosys_diag_DOFe_prod(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DOFe_prod(iLevel,column)
+               ecosys_diag_DOFe_remin(iLevel,iCell) = c_init*ecosys_diag_DOFe_remin(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DOFe_remin(iLevel,column)
+               ecosys_diag_Fe_scavenge(iLevel,iCell) = c_init*ecosys_diag_Fe_scavenge(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_Fe_scavenge(iLevel,column)
+               ecosys_diag_Fe_scavenge_rate(iLevel,iCell) = c_init*ecosys_diag_Fe_scavenge_rate(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_Fe_scavenge_rate(iLevel,column)
+               ecosys_diag_DONr_remin(iLevel,iCell) = c_init*ecosys_diag_DONr_remin(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DONr_remin(iLevel,column)
+               ecosys_diag_DOPr_remin(iLevel,iCell) = c_init*ecosys_diag_DOPr_remin(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_DOPr_remin(iLevel,column)
+               ecosys_diag_ponToSed(iLevel,iCell) = c_init*ecosys_diag_ponToSed(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_ponToSed(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_popToSed(iLevel,iCell) = c_init*ecosys_diag_popToSed(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_popToSed(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_bsiToSed(iLevel,iCell) = c_init*ecosys_diag_bsiToSed(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_bsiToSed(iLevel,column)*convertLengthCGStoMKS
 ! convert units from g/cm2/s to kg/m2/s
-               ecosys_diag_dustToSed(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_dustToSed(iLevel,column)*1.e-7_RKIND
-               ecosys_diag_OtherRemin(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_OtherRemin(iLevel,column)*convertLengthCGStoMKS
+               ecosys_diag_dustToSed(iLevel,iCell) = c_init*ecosys_diag_dustToSed(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_dustToSed(iLevel,column)*1.e-7_RKIND
+               ecosys_diag_OtherRemin(iLevel,iCell) = c_init*ecosys_diag_OtherRemin(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_OtherRemin(iLevel,column)*convertLengthCGStoMKS
 
                do autotroph = 1, autotroph_cnt
-                  ecosys_diag_bSi_form(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_bSi_form(iLevel,column,autotroph)
+                  ecosys_diag_bSi_form(autotroph,iLevel,iCell) = c_init*ecosys_diag_bSi_form(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_bSi_form(iLevel,column,autotroph)
                enddo  !  autotroph loop
 
             endif  !  config_ecosysTracers_diagnostic_fields_level3
@@ -904,34 +914,34 @@ contains
             ! level 4 diagnostics
             !
             if (config_ecosysTracers_diagnostic_fields_level4) then
-               ecosys_diag_CaCO3_PROD(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_CaCO3_PROD(iLevel,column)
-               ecosys_diag_CaCO3_REMIN(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_CaCO3_REMIN(iLevel,column)
-               ecosys_diag_tot_CaCO3_form(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_tot_CaCO3_form(iLevel,column)
-               ecosys_diag_CO3(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_CO3(iLevel,column)
-               ecosys_diag_HCO3(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_HCO3(iLevel,column)
-               ecosys_diag_H2CO3(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_H2CO3(iLevel,column)
-               ecosys_diag_CO3_ALT_CO2(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_CO3_ALT_CO2(iLevel,column)
-               ecosys_diag_HCO3_ALT_CO2(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_HCO3_ALT_CO2(iLevel,column)
-               ecosys_diag_H2CO3_ALT_CO2(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_H2CO3_ALT_CO2(iLevel,column)
-               ecosys_diag_pH_3D_ALT_CO2(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_pH_3D_ALT_CO2(iLevel,column)
-               ecosys_diag_co3_sat_calc(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_co3_sat_calc(iLevel,column)
-               ecosys_diag_co3_sat_arag(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_co3_sat_arag(iLevel,column)
+               ecosys_diag_CaCO3_PROD(iLevel,iCell) = c_init*ecosys_diag_CaCO3_PROD(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_CaCO3_PROD(iLevel,column)
+               ecosys_diag_CaCO3_REMIN(iLevel,iCell) = c_init*ecosys_diag_CaCO3_REMIN(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_CaCO3_REMIN(iLevel,column)
+               ecosys_diag_tot_CaCO3_form(iLevel,iCell) = c_init*ecosys_diag_tot_CaCO3_form(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_tot_CaCO3_form(iLevel,column)
+               ecosys_diag_CO3(iLevel,iCell) = c_init*ecosys_diag_CO3(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_CO3(iLevel,column)
+               ecosys_diag_HCO3(iLevel,iCell) = c_init*ecosys_diag_HCO3(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_HCO3(iLevel,column)
+               ecosys_diag_H2CO3(iLevel,iCell) = c_init*ecosys_diag_H2CO3(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_H2CO3(iLevel,column)
+               ecosys_diag_CO3_ALT_CO2(iLevel,iCell) = c_init*ecosys_diag_CO3_ALT_CO2(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_CO3_ALT_CO2(iLevel,column)
+               ecosys_diag_HCO3_ALT_CO2(iLevel,iCell) = c_init*ecosys_diag_HCO3_ALT_CO2(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_HCO3_ALT_CO2(iLevel,column)
+               ecosys_diag_H2CO3_ALT_CO2(iLevel,iCell) = c_init*ecosys_diag_H2CO3_ALT_CO2(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_H2CO3_ALT_CO2(iLevel,column)
+               ecosys_diag_pH_3D_ALT_CO2(iLevel,iCell) = c_init*ecosys_diag_pH_3D_ALT_CO2(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_pH_3D_ALT_CO2(iLevel,column)
+               ecosys_diag_co3_sat_calc(iLevel,iCell) = c_init*ecosys_diag_co3_sat_calc(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_co3_sat_calc(iLevel,column)
+               ecosys_diag_co3_sat_arag(iLevel,iCell) = c_init*ecosys_diag_co3_sat_arag(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_co3_sat_arag(iLevel,column)
 
                do autotroph = 1, autotroph_cnt
-                  ecosys_diag_CaCO3_form(autotroph,iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_CaCO3_form(iLevel,column,autotroph)
+                  ecosys_diag_CaCO3_form(autotroph,iLevel,iCell) = c_init*ecosys_diag_CaCO3_form(autotroph,iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_CaCO3_form(iLevel,column,autotroph)
                enddo
             endif  !  config_ecosysTracers_diagnostic_fields_level4
 
@@ -940,12 +950,12 @@ contains
             !
 
             if (config_ecosysTracers_diagnostic_fields_level5) then
-                  ecosys_diag_PO4_RESTORE(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_PO4_RESTORE(iLevel,column)
-                     ecosys_diag_NO3_RESTORE(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_NO3_RESTORE(iLevel,column)
-                     ecosys_diag_SiO3_RESTORE(iLevel,iCell) =  &
-                           BGC_diagnostic_fields%diag_SiO3_RESTORE(iLevel,column)
+                  ecosys_diag_PO4_RESTORE(iLevel,iCell) = c_init*ecosys_diag_PO4_RESTORE(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_PO4_RESTORE(iLevel,column)
+                     ecosys_diag_NO3_RESTORE(iLevel,iCell) = c_init*ecosys_diag_NO3_RESTORE(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_NO3_RESTORE(iLevel,column)
+                     ecosys_diag_SiO3_RESTORE(iLevel,iCell) = c_init*ecosys_diag_SiO3_RESTORE(iLevel,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_SiO3_RESTORE(iLevel,column)
             endif  !  config_ecosysTracers_diagnostic_fields_level5
 
          enddo  !  iLevel
@@ -954,38 +964,38 @@ contains
          ! level 1 diagnostics with no depth dependence
          !
          if (config_ecosysTracers_diagnostic_fields_level1) then
-            ecosys_diag_photoC_TOT_zint(iCell) =  &
-                        BGC_diagnostic_fields%diag_photoC_TOT_zint(column)*convertLengthCGStoMKS
-            ecosys_diag_photoC_NO3_TOT_zint(iCell) =  &
-                        BGC_diagnostic_fields%diag_photoC_NO3_TOT_zint(column)*convertLengthCGStoMKS
-            ecosys_diag_O2_ZMIN(iCell) =  &
-                        BGC_diagnostic_fields%diag_O2_ZMIN(column)
-            ecosys_diag_O2_ZMIN_DEPTH(iCell) =  &
-                        BGC_diagnostic_fields%diag_O2_ZMIN_DEPTH(column)*convertLengthCGStoMKS
-            ecosys_diag_Chl_TOT_zint_100m(iCell) =  &
-                        BGC_diagnostic_fields%diag_Chl_TOT_zint_100m(column)*convertLengthCGStoMKS
-            ecosys_diag_Jint_Ctot(iCell) =  &
-                        BGC_diagnostic_fields%diag_Jint_Ctot(column)*convertLengthCGStoMKS
-            ecosys_diag_Jint_100m_Ctot(iCell) =  &
-                        BGC_diagnostic_fields%diag_Jint_100m_Ctot(column)*convertLengthCGStoMKS
-            ecosys_diag_Jint_Ntot(iCell) =  &
-                        BGC_diagnostic_fields%diag_Jint_Ntot(column)*convertLengthCGStoMKS
-            ecosys_diag_Jint_100m_Ntot(iCell) =  &
-                        BGC_diagnostic_fields%diag_Jint_100m_Ntot(column)*convertLengthCGStoMKS
-            ecosys_diag_Jint_Ptot(iCell) =  &
-                        BGC_diagnostic_fields%diag_Jint_Ptot(column)*convertLengthCGStoMKS
-            ecosys_diag_Jint_100m_Ptot(iCell) =  &
-                        BGC_diagnostic_fields%diag_Jint_100m_Ptot(column)*convertLengthCGStoMKS
-            ecosys_diag_Jint_Sitot(iCell) =  &
-                        BGC_diagnostic_fields%diag_Jint_Sitot(column)*convertLengthCGStoMKS
-            ecosys_diag_Jint_100m_Sitot(iCell) =  &
-                        BGC_diagnostic_fields%diag_Jint_100m_Sitot(column)*convertLengthCGStoMKS
+            ecosys_diag_photoC_TOT_zint(iCell) = c_init*ecosys_diag_photoC_TOT_zint(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_photoC_TOT_zint(column)*convertLengthCGStoMKS
+            ecosys_diag_photoC_NO3_TOT_zint(iCell) = c_init*ecosys_diag_photoC_NO3_TOT_zint(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_photoC_NO3_TOT_zint(column)*convertLengthCGStoMKS
+            ecosys_diag_O2_ZMIN(iCell) = c_init*ecosys_diag_O2_ZMIN(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_O2_ZMIN(column)
+            ecosys_diag_O2_ZMIN_DEPTH(iCell) = c_init*ecosys_diag_O2_ZMIN_DEPTH(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_O2_ZMIN_DEPTH(column)*convertLengthCGStoMKS
+            ecosys_diag_Chl_TOT_zint_100m(iCell) = c_init*ecosys_diag_Chl_TOT_zint_100m(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_Chl_TOT_zint_100m(column)*convertLengthCGStoMKS
+            ecosys_diag_Jint_Ctot(iCell) = c_init*ecosys_diag_Jint_Ctot(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_Jint_Ctot(column)*convertLengthCGStoMKS
+            ecosys_diag_Jint_100m_Ctot(iCell) = c_init*ecosys_diag_Jint_100m_Ctot(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_Jint_100m_Ctot(column)*convertLengthCGStoMKS
+            ecosys_diag_Jint_Ntot(iCell) = c_init*ecosys_diag_Jint_Ntot(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_Jint_Ntot(column)*convertLengthCGStoMKS
+            ecosys_diag_Jint_100m_Ntot(iCell) = c_init*ecosys_diag_Jint_100m_Ntot(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_Jint_100m_Ntot(column)*convertLengthCGStoMKS
+            ecosys_diag_Jint_Ptot(iCell) = c_init*ecosys_diag_Jint_Ptot(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_Jint_Ptot(column)*convertLengthCGStoMKS
+            ecosys_diag_Jint_100m_Ptot(iCell) = c_init*ecosys_diag_Jint_100m_Ptot(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_Jint_100m_Ptot(column)*convertLengthCGStoMKS
+            ecosys_diag_Jint_Sitot(iCell) = c_init*ecosys_diag_Jint_Sitot(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_Jint_Sitot(column)*convertLengthCGStoMKS
+            ecosys_diag_Jint_100m_Sitot(iCell) = c_init*ecosys_diag_Jint_100m_Sitot(iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_Jint_100m_Sitot(column)*convertLengthCGStoMKS
 
             do autotroph = 1, autotroph_cnt
-               ecosys_diag_photoC_zint(autotroph,iCell) =  &
-                        BGC_diagnostic_fields%diag_photoC_zint(column,autotroph)*convertLengthCGStoMKS
-               ecosys_diag_photoC_NO3_zint(autotroph,iCell) =  &
-                        BGC_diagnostic_fields%diag_photoC_NO3_zint(column,autotroph)*convertLengthCGStoMKS
+               ecosys_diag_photoC_zint(autotroph,iCell) = c_init*ecosys_diag_photoC_zint(autotroph,iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_photoC_zint(column,autotroph)*convertLengthCGStoMKS
+               ecosys_diag_photoC_NO3_zint(autotroph,iCell) = c_init*ecosys_diag_photoC_NO3_zint(autotroph,iCell) + &
+                        c_accum*BGC_diagnostic_fields%diag_photoC_NO3_zint(column,autotroph)*convertLengthCGStoMKS
             enddo
 
          endif  !  config_ecosysTracers_diagnostic_fields_level1
@@ -994,35 +1004,27 @@ contains
          ! level 3 diagnostics with no depth dependence
          !
          if (config_ecosysTracers_diagnostic_fields_level3) then
-            ecosys_diag_tot_bSi_form(iCell) =  &
-                           BGC_diagnostic_fields%diag_tot_bSi_form(column)
+            ecosys_diag_tot_bSi_form(iCell) = c_init*ecosys_diag_tot_bSi_form(iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_tot_bSi_form(column)
          endif  !  config_ecosysTracers_diagnostic_fields_level3
 
          !
          ! level 4 diagnostics with no depth dependence
          !
          if (config_ecosysTracers_diagnostic_fields_level4) then
-            ecosys_diag_tot_CaCO3_form_zint(iCell) =  &
-                           BGC_diagnostic_fields%diag_tot_CaCO3_form_zint(column)*convertLengthCGStoMKS
-            ecosys_diag_zsatcalc(iCell) =  &
-                           BGC_diagnostic_fields%diag_zsatcalc(column)*convertLengthCGStoMKS
-            ecosys_diag_zsatarag(iCell) =  &
-                           BGC_diagnostic_fields%diag_zsatarag(column)*convertLengthCGStoMKS
+            ecosys_diag_tot_CaCO3_form_zint(iCell) = c_init*ecosys_diag_tot_CaCO3_form_zint(iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_tot_CaCO3_form_zint(column)*convertLengthCGStoMKS
+            ecosys_diag_zsatcalc(iCell) = c_init*ecosys_diag_zsatcalc(iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_zsatcalc(column)*convertLengthCGStoMKS
+            ecosys_diag_zsatarag(iCell) = c_init*ecosys_diag_zsatarag(iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_zsatarag(column)*convertLengthCGStoMKS
 
             do autotroph = 1, autotroph_cnt
-               ecosys_diag_CaCO3_form_zint(autotroph,iCell) =  &
-                           BGC_diagnostic_fields%diag_CaCO3_form_zint(column,autotroph)*convertLengthCGStoMKS
+               ecosys_diag_CaCO3_form_zint(autotroph,iCell) = c_init*ecosys_diag_CaCO3_form_zint(autotroph,iCell) + &
+                           c_accum*BGC_diagnostic_fields%diag_CaCO3_form_zint(column,autotroph)*convertLengthCGStoMKS
             enddo
 
          endif  !  config_ecosysTracers_diagnostic_fields_level4
-
-         if (amb_diag_carbon()) then
-            do iLevel = 1, maxLevelCell(iCell)
-               diag_carbon(1) = diag_carbon(1) + areaCell(iCell)*ecosys_diag_calcToSed(iLevel,iCell)
-               diag_carbon(2) = diag_carbon(2) + areaCell(iCell)*ecosys_diag_pocToSed(iLevel,iCell)
-            end do
-            diag_carbon(3) = diag_carbon(3) + areaCell(iCell)*ecosys_diag_Jint_Ctot(iCell)
-         end if
       end subroutine wrap_SourceSink
 
    !--------------------------------------------------------------------
