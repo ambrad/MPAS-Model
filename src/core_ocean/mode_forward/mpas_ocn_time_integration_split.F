@@ -2025,7 +2025,7 @@ module ocn_time_integration_split
          if ( groupItr % memberType == MPAS_POOL_FIELD ) then
             is_active = trim(groupItr % memberName) == 'activeTracers'
             if (amb_use()) then
-               if (.not. is_active .and. .not. amb_is_tracer_step()) cycle
+               if (.not. is_active .and. .not. amb_is_tracer_step() .and. amb_supc_vmix()) cycle
             end if
             call mpas_dmpar_field_halo_exch(domain, groupItr % memberName, timeLevel=2)
          end if

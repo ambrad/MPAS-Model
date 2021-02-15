@@ -359,7 +359,7 @@ contains
       subcycle = .false.
       supercycle = 1
       if (amb_use()) then
-         subcycle = amb_sc_params()
+         subcycle = amb_subc_params()
          if (subcycle) supercycle = amb_get_supercycle()
       end if
 

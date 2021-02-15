@@ -1142,7 +1142,7 @@ contains
 
          if ( groupItr % memberType == MPAS_POOL_FIELD ) then
             dtuse = dt
-            if (amb_use()) then
+            if (amb_use() .and. amb_supc_vmix()) then
                if (trim(groupItr % memberName) /= 'activeTracers') then
                   if (.not. amb_is_tracer_step()) cycle
                   dtuse = amb_get_supercycle()*dt
