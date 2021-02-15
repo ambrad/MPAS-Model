@@ -14,7 +14,7 @@ module amb
   ! 3 for baro10km with 2hr dt
   ! 2 for baro4km with 1hr dt
   integer :: supercycle
-  logical :: sc_use, subc_params, supc_vmix, diag_carbon
+  logical :: sc_use, subc_params, diag_carbon
 
   logical :: first = .true.
   integer :: mpirank, comm_global
@@ -42,11 +42,6 @@ contains
     logical :: u
     u = subc_params
   end function amb_subc_params
-
-  function amb_supc_vmix() result (u)
-    logical :: u
-    u = supc_vmix
-  end function amb_supc_vmix
 
   subroutine amb_set_timestep(comm)
     integer, intent(in) :: comm
@@ -108,17 +103,11 @@ contains
        sc_use = supercycle > 0!1
     end if
     subc_params = sc_use
-    supc_vmix = sc_use
     if (sc_use) then
        call get_environment_variable("amb_subc_params", env_str, status=err)
        if (err /= 1) then
           read(env_str, '(i)', iostat=err) tmp
           subc_params = tmp /= 0
-       end if
-       call get_environment_variable("amb_supc_vmix", env_str, status=err)
-       if (err /= 1) then
-          read(env_str, '(i)', iostat=err) tmp
-          supc_vmix = tmp /= 0
        end if
     end if
     diag_carbon = .false.
@@ -130,8 +119,7 @@ contains
     
     if (amroot) then
        print '(a,l,a,l,a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
-            ' subc params', subc_params, ' supc vmix', supc_vmix, &
-            ' sc', supercycle, ' diagC', diag_carbon
+            ' subc params', subc_params, ' sc', supercycle, ' diagC', diag_carbon
     end if
   end subroutine amb_init
 
