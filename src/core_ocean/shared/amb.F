@@ -81,7 +81,8 @@ contains
   end function amb_get_rank
 
   subroutine amb_init(comm)
-    integer, intent(in) :: comm
+    integer, intent(in), optional :: comm
+
     integer :: err
     character (len=255) :: env_str
     integer :: tmp
@@ -89,7 +90,11 @@ contains
     if (.not. first) return
     first = .false.
 
-    comm_global = comm
+    if (present(comm)) then
+       comm_global = comm
+    else
+       comm_global = MPI_COMM_WORLD
+    end if
     timestep = 0
 
     call mpi_comm_rank(comm_global, mpirank, err)
