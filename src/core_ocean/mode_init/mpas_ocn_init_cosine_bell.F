@@ -92,7 +92,7 @@ contains
       type (block_type), pointer :: block_ptr
 
       type (mpas_pool_type), pointer :: meshPool, verticalMeshPool,statePool
-      type (mpas_pool_type), pointer :: diagnosticsPool, forcingPool
+      type (mpas_pool_type), pointer :: forcingPool
 
       type (mpas_pool_type), pointer :: tracersPool
 
@@ -101,7 +101,7 @@ contains
 
       integer, dimension(:), pointer :: maxLevelCell
       real (kind=RKIND), dimension(:), pointer :: refBottomDepth,refZMid
-      real (kind=RKIND), dimension(:), pointer :: lonCell, latEdge, latCell, latVertex 
+      real (kind=RKIND), dimension(:), pointer :: lonCell, latEdge, latCell, latVertex
       real (kind=RKIND), dimension(:), pointer :: bottomDepth, angleEdge
       real (kind=RKIND), dimension(:), pointer :: fCell, fEdge, fVertex,xCell, yCell
       real (kind=RKIND), dimension(:, :), pointer :: layerThickness,restingThickness,normalVelocity
@@ -151,11 +151,10 @@ contains
         call mpas_pool_get_subpool(block_ptr % structs, 'mesh',meshPool)
         call mpas_pool_get_subpool(block_ptr % structs, 'verticalMesh',verticalMeshPool)
         call mpas_pool_get_subpool(block_ptr % structs, 'state',statePool)
-        call mpas_pool_get_subpool(block_ptr % structs, 'diagnostics',diagnosticsPool)
         call mpas_pool_get_subpool(block_ptr % structs, 'forcing',forcingPool)
 
         call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
-      
+
         call mpas_pool_get_dimension(meshPool, 'nVertLevels',nVertLevels)
         call mpas_pool_get_dimension(meshPool, 'nCellsSolve',nCellsSolve)
         call mpas_pool_get_dimension(meshPool, 'nEdge', nEdge)
@@ -200,7 +199,7 @@ contains
            if(associated(activeTracers) ) then
 
            ! Loop from surface through surface layer depth
-        
+
            activeTracers(index_temperature, :, iCell) = config_cosine_bell_temperature
            activeTracers(index_salinity, :, iCell) = config_cosine_bell_salinity
           endif
@@ -219,7 +218,7 @@ contains
         endif
         ! Set layerThickness
         do k = 1, nVertLevels
-           layerThickness(k, iCell) = 100.0_RKIND 
+           layerThickness(k, iCell) = 100.0_RKIND
            restingThickness(k, iCell) = layerThickness(k, iCell)
         end do
 
@@ -288,7 +287,7 @@ contains
 
       call mpas_pool_get_config(configPool, 'config_vert_levels',config_vert_levels)
 
-      config_vert_levels = 3 
+      config_vert_levels = 3
 
    !--------------------------------------------------------------------
 
@@ -300,3 +299,4 @@ end module ocn_init_cosine_bell
 
 !|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 ! vim: foldmethod=marker
+

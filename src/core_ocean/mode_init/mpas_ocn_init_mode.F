@@ -37,6 +37,7 @@ module ocn_init_mode
 
    use ocn_constants
    use ocn_config
+   use ocn_diagnostics
 
    use ocn_init_spherical_utils
    use ocn_init_cosine_bell
@@ -143,6 +144,9 @@ module ocn_init_mode
       call mpas_stream_mgr_reset_alarms(domain % streamManager, direction=MPAS_STREAM_INPUT, ierr=err_tmp)
       ierr = ior(ierr, err_tmp)
       call mpas_timer_stop('reset_io_alarms')
+
+      ! Initialize diagnostics variables
+      call ocn_diagnostics_init(domain, err_tmp)
 
       ! Initialize submodules before initializing blocks.
       call ocn_equation_of_state_init(domain, err_tmp)
@@ -290,6 +294,7 @@ module ocn_init_mode
       call ocn_init_setup_tidal_boundary(domain, ierr)
       call ocn_init_setup_cosine_bell(domain, ierr)
       call ocn_init_setup_act(domain, ierr)
+      call ocn_init_setup_cosine_bell(domain, ierr)
       !call ocn_init_setup_TEMPLATE(domain, ierr)
 
       call mpas_log_write( ' Completed setup of: ' // trim(config_init_configuration))

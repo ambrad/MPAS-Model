@@ -31,6 +31,7 @@ module ocn_test
 
    use ocn_constants
    use ocn_config
+   use ocn_diagnostics_variables
 
    implicit none
    private
@@ -246,7 +247,7 @@ contains
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_init_gm_test_functions(diagnosticsPool, meshPool, scratchPool)!{{{
+   subroutine ocn_init_gm_test_functions(meshPool, scratchPool)!{{{
 
       !-----------------------------------------------------------------
       !
@@ -263,7 +264,6 @@ contains
       !
       !-----------------------------------------------------------------
 
-      type (mpas_pool_type), intent(inout) :: diagnosticsPool  !< Input: diagnostic fields derived from State
       type (mpas_pool_type), intent(in) :: scratchPool !< Input: scratch variables
 
       !-----------------------------------------------------------------
@@ -280,7 +280,6 @@ contains
          config_gm_analytic_bottom_depth, L, R, c1, c2, zMax, zBot
 
       real(kind=RKIND), dimension(:), pointer   :: bottomDepth, refBottomDepthTopOfCell, yCell, yEdge
-      real(kind=RKIND), dimension(:,:), pointer :: zMid
 
       ! Scratch Arrays
       ! yGMStreamFuncSolution: GM stream function reconstructured to the cell centers,
@@ -301,8 +300,6 @@ contains
       call mpas_pool_get_array(meshPool, 'yEdge',yEdge)
       call mpas_pool_get_array(meshPool, 'bottomDepth',bottomDepth)
 
-      call mpas_pool_get_array(diagnosticsPool, 'zMid', zMid)
-
       nVertLevels = maxval(maxLevelCell)
 
       allocate(yGMStreamFuncSolution(nVertLevels + 1, nCells), &
@@ -320,7 +317,7 @@ contains
       zBot = zMax
 
       L = config_GM_constant_gravWaveSpeed * sqrt(rho_sw * zMax / gravity / config_eos_linear_alpha / config_gm_analytic_temperature3)
-      R = - config_GM_kappa * config_gm_analytic_temperature2 * zMax / config_gm_analytic_temperature3 &
+      R = - config_GM_constant_kappa * config_gm_analytic_temperature2 * zMax / config_gm_analytic_temperature3 &
         / config_gm_analytic_ymax
       c1 = R*(1-exp(-zBot/L))/(exp(zBot/L) - exp(-zBot/L))
       c2 = R-c1

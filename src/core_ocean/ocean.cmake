@@ -1,7 +1,16 @@
 
 # build_options.mk stuff handled here
 list(APPEND CPPDEFS "-DCORE_OCEAN")
+list(APPEND CPPDEFS "-DEXCLUDE_INIT_MODE")
 list(APPEND INCLUDES "${CMAKE_BINARY_DIR}/core_ocean/shared") # Only need this for '#include "../inc/core_variables.inc"' to work
+
+# check if lapack is linked
+find_package(LAPACK)
+find_package(BLAS)
+if(LAPACK_FOUND AND BLAS_FOUND)
+  list(APPEND CPPDEFS "-DUSE_LAPACK")
+  list(APPEND SLIBS "${LAPACK_LIBRARIES} ${BLAS_LIBRARIES}")
+endif()
 
 # driver (files live in E3SM)
 list(APPEND RAW_SOURCES
@@ -16,9 +25,11 @@ list(APPEND RAW_SOURCES
   core_ocean/mode_forward/mpas_ocn_time_integration.F
   core_ocean/mode_forward/mpas_ocn_time_integration_rk4.F
   core_ocean/mode_forward/mpas_ocn_time_integration_split.F
+  core_ocean/mode_forward/mpas_ocn_time_integration_si.F
 
   core_ocean/mode_analysis/mpas_ocn_analysis_mode.F
 
+<<<<<<< HEAD
   core_ocean/mode_init/mpas_ocn_init_mode.F
   core_ocean/mode_init/mpas_ocn_init_spherical_utils.F
   core_ocean/mode_init/mpas_ocn_init_vertical_grids.F
@@ -46,10 +57,39 @@ list(APPEND RAW_SOURCES
   core_ocean/mode_init/mpas_ocn_init_smoothing.F
   core_ocean/mode_init/mpas_ocn_init_cosine_bell.F
 
+||||||| merged common ancestors
+  core_ocean/mode_init/mpas_ocn_init_mode.F
+  core_ocean/mode_init/mpas_ocn_init_spherical_utils.F
+  core_ocean/mode_init/mpas_ocn_init_vertical_grids.F
+  core_ocean/mode_init/mpas_ocn_init_cell_markers.F
+  core_ocean/mode_init/mpas_ocn_init_interpolation.F
+  core_ocean/mode_init/mpas_ocn_init_ssh_and_landIcePressure.F
+  core_ocean/mode_init/mpas_ocn_init_baroclinic_channel.F
+  core_ocean/mode_init/mpas_ocn_init_lock_exchange.F
+  core_ocean/mode_init/mpas_ocn_init_dam_break.F
+  core_ocean/mode_init/mpas_ocn_init_internal_waves.F
+  core_ocean/mode_init/mpas_ocn_init_overflow.F
+  core_ocean/mode_init/mpas_ocn_init_cvmix_WSwSBF.F
+  core_ocean/mode_init/mpas_ocn_init_iso.F
+  core_ocean/mode_init/mpas_ocn_init_soma.F
+  core_ocean/mode_init/mpas_ocn_init_ziso.F
+  core_ocean/mode_init/mpas_ocn_init_sub_ice_shelf_2D.F
+  core_ocean/mode_init/mpas_ocn_init_periodic_planar.F
+  core_ocean/mode_init/mpas_ocn_init_ecosys_column.F
+  core_ocean/mode_init/mpas_ocn_init_sea_mount.F
+  core_ocean/mode_init/mpas_ocn_init_global_ocean.F
+  core_ocean/mode_init/mpas_ocn_init_isomip.F
+  core_ocean/mode_init/mpas_ocn_init_hurricane.F
+  core_ocean/mode_init/mpas_ocn_init_isomip_plus.F
+  core_ocean/mode_init/mpas_ocn_init_tidal_boundary.F
+  core_ocean/mode_init/mpas_ocn_init_smoothing.F
+
+=======
+>>>>>>> fork/ocean/develop
   core_ocean/shared/mpas_ocn_init_routines.F
   core_ocean/shared/mpas_ocn_gm.F
   core_ocean/shared/mpas_ocn_diagnostics.F
-  core_ocean/shared/mpas_ocn_diagnostics_routines.F
+  core_ocean/shared/mpas_ocn_diagnostics_variables.F
   core_ocean/shared/mpas_ocn_mesh.F
   core_ocean/shared/mpas_ocn_thick_ale.F
   core_ocean/shared/mpas_ocn_equation_of_state.F
@@ -118,8 +158,8 @@ list(APPEND RAW_SOURCES ${OCEAN_DRIVER})
 list(APPEND DISABLE_QSMP ${OCEAN_DRIVER})
 
 # Add CVMix
-if (NOT EXISTS core_ocean/cvmix/.git)
-  message(FATAL "Missing core_ocean/cvmix/.git, did you forget to 'git submodule update --init --recursive' ?")
+if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/core_ocean/cvmix/.git)
+  message(FATAL_ERROR "Missing core_ocean/cvmix/.git, did you forget to 'git submodule update --init --recursive' ?")
 endif()
 set(CVMIX_FILES
   core_ocean/cvmix/src/shared/cvmix_kinds_and_types.F90
@@ -135,8 +175,8 @@ set(CVMIX_FILES
 )
 
 # Add BGC
-if (NOT EXISTS core_ocean/BGC/.git)
-  message(FATAL "Missing core_ocean/BGC/.git, did you forget to 'git submodule update --init --recursive' ?")
+if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/core_ocean/BGC/.git)
+  message(FATAL_ERROR "Missing core_ocean/BGC/.git, did you forget to 'git submodule update --init --recursive' ?")
 endif()
 set(BGC_FILES
   core_ocean/BGC/BGC_mod.F90
@@ -188,7 +228,7 @@ list(APPEND RAW_SOURCES
 
 # Generate core input
 handle_st_nl_gen(
-  "namelist.ocean;namelist.ocean.forward mode=forward;namelist.ocean.analysis mode=analysis;namelist.ocean.init mode=init"
-  "streams.ocean stream_list.ocean. mutable;streams.ocean.forward stream_list.ocean.forward. mutable mode=forward;streams.ocean.analysis stream_list.ocean.analysis. mutable mode=analysis;streams.ocean.init stream_list.ocean.init. mutable mode=init"
+  "namelist.ocean;namelist.ocean.forward mode=forward;namelist.ocean.analysis mode=analysis"
+  "streams.ocean stream_list.ocean. mutable;streams.ocean.forward stream_list.ocean.forward. mutable mode=forward;streams.ocean.analysis stream_list.ocean.analysis. mutable mode=analysis"
   ${CORE_INPUT_DIR} ${CORE_BLDDIR}
 )
