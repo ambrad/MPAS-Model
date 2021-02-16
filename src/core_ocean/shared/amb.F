@@ -247,7 +247,7 @@ contains
     end if
 
     if (timestep == next_timestep) then
-       if (timestep == 1) then
+       if (timestep == 1 .and. sc_use) then
           huse => layerThickness0
        else
           huse => h
@@ -277,9 +277,11 @@ contains
           end do
        end if
        next_timestep = timestep + 50
-       do while (supercycle > 0 .and. modulo(next_timestep, supercycle) /= 0)
-          next_timestep = next_timestep + 1
-       end do
+       if (supercycle > 0) then
+          do while (modulo(next_timestep, supercycle) /= 0)
+             next_timestep = next_timestep + 1
+          end do
+       end if
     end if
   end subroutine amb_check_debug_tracers
 
