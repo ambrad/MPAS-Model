@@ -29,63 +29,6 @@ list(APPEND RAW_SOURCES
 
   core_ocean/mode_analysis/mpas_ocn_analysis_mode.F
 
-<<<<<<< HEAD
-  core_ocean/mode_init/mpas_ocn_init_mode.F
-  core_ocean/mode_init/mpas_ocn_init_spherical_utils.F
-  core_ocean/mode_init/mpas_ocn_init_vertical_grids.F
-  core_ocean/mode_init/mpas_ocn_init_cell_markers.F
-  core_ocean/mode_init/mpas_ocn_init_interpolation.F
-  core_ocean/mode_init/mpas_ocn_init_ssh_and_landIcePressure.F
-  core_ocean/mode_init/mpas_ocn_init_baroclinic_channel.F
-  core_ocean/mode_init/mpas_ocn_init_lock_exchange.F
-  core_ocean/mode_init/mpas_ocn_init_dam_break.F
-  core_ocean/mode_init/mpas_ocn_init_internal_waves.F
-  core_ocean/mode_init/mpas_ocn_init_overflow.F
-  core_ocean/mode_init/mpas_ocn_init_cvmix_WSwSBF.F
-  core_ocean/mode_init/mpas_ocn_init_iso.F
-  core_ocean/mode_init/mpas_ocn_init_soma.F
-  core_ocean/mode_init/mpas_ocn_init_ziso.F
-  core_ocean/mode_init/mpas_ocn_init_sub_ice_shelf_2D.F
-  core_ocean/mode_init/mpas_ocn_init_periodic_planar.F
-  core_ocean/mode_init/mpas_ocn_init_ecosys_column.F
-  core_ocean/mode_init/mpas_ocn_init_sea_mount.F
-  core_ocean/mode_init/mpas_ocn_init_global_ocean.F
-  core_ocean/mode_init/mpas_ocn_init_isomip.F
-  core_ocean/mode_init/mpas_ocn_init_hurricane.F
-  core_ocean/mode_init/mpas_ocn_init_isomip_plus.F
-  core_ocean/mode_init/mpas_ocn_init_tidal_boundary.F
-  core_ocean/mode_init/mpas_ocn_init_smoothing.F
-  core_ocean/mode_init/mpas_ocn_init_cosine_bell.F
-
-||||||| merged common ancestors
-  core_ocean/mode_init/mpas_ocn_init_mode.F
-  core_ocean/mode_init/mpas_ocn_init_spherical_utils.F
-  core_ocean/mode_init/mpas_ocn_init_vertical_grids.F
-  core_ocean/mode_init/mpas_ocn_init_cell_markers.F
-  core_ocean/mode_init/mpas_ocn_init_interpolation.F
-  core_ocean/mode_init/mpas_ocn_init_ssh_and_landIcePressure.F
-  core_ocean/mode_init/mpas_ocn_init_baroclinic_channel.F
-  core_ocean/mode_init/mpas_ocn_init_lock_exchange.F
-  core_ocean/mode_init/mpas_ocn_init_dam_break.F
-  core_ocean/mode_init/mpas_ocn_init_internal_waves.F
-  core_ocean/mode_init/mpas_ocn_init_overflow.F
-  core_ocean/mode_init/mpas_ocn_init_cvmix_WSwSBF.F
-  core_ocean/mode_init/mpas_ocn_init_iso.F
-  core_ocean/mode_init/mpas_ocn_init_soma.F
-  core_ocean/mode_init/mpas_ocn_init_ziso.F
-  core_ocean/mode_init/mpas_ocn_init_sub_ice_shelf_2D.F
-  core_ocean/mode_init/mpas_ocn_init_periodic_planar.F
-  core_ocean/mode_init/mpas_ocn_init_ecosys_column.F
-  core_ocean/mode_init/mpas_ocn_init_sea_mount.F
-  core_ocean/mode_init/mpas_ocn_init_global_ocean.F
-  core_ocean/mode_init/mpas_ocn_init_isomip.F
-  core_ocean/mode_init/mpas_ocn_init_hurricane.F
-  core_ocean/mode_init/mpas_ocn_init_isomip_plus.F
-  core_ocean/mode_init/mpas_ocn_init_tidal_boundary.F
-  core_ocean/mode_init/mpas_ocn_init_smoothing.F
-
-=======
->>>>>>> fork/ocean/develop
   core_ocean/shared/mpas_ocn_init_routines.F
   core_ocean/shared/mpas_ocn_gm.F
   core_ocean/shared/mpas_ocn_diagnostics.F
@@ -148,6 +91,7 @@ list(APPEND RAW_SOURCES
   core_ocean/shared/mpas_ocn_time_varying_forcing.F
   core_ocean/shared/mpas_ocn_wetting_drying.F
   core_ocean/shared/mpas_ocn_vel_tidal_potential.F
+  core_ocean/shared/amb.F
 )
 
 set(OCEAN_DRIVER

@@ -228,7 +228,7 @@ contains
     real(RKIND) :: maxerr, mass, send(ndbgq), recv(ndbgq), err
     real(RKIND), pointer :: huse(:,:)
 
-    if (modulo(timestep-1, 10) == 0) then
+    if (.false. .and. modulo(timestep-1, 10) == 0) then
        ! Debug tracer 3 mixing ratio is uniformly 42. Check departure from that.
        maxerr = 0
        do ic = 1, nCells

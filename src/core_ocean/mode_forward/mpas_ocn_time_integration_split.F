@@ -306,7 +306,6 @@ module ocn_time_integration_split
 
          ! Initialize * variables that are used to compute baroclinic tendencies below.
 
-         call mpas_pool_get_array(diagnosticsPool, 'daysSinceStartOfSim', daysSinceStartOfSim)
          !call act_velocity(meshPool, daysSinceStartOfSim, dt/2, normalVelocityCur)
 
          !$omp parallel
