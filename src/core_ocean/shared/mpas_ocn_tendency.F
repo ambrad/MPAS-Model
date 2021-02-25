@@ -540,7 +540,7 @@ contains
       logical :: active_tracers, zero_surface_flux
       real (kind=RKIND), dimension(:), pointer :: areaCell
       real (kind=RKIND), dimension(:,:), pointer :: layerThicknessLcl, zMidLcl, &
-           vertAleTransportTopLcl
+           vertAleTransportTopLcl, layerThickEdgeLcl
 
       !
       ! set time level of optional argument is present
@@ -625,6 +625,7 @@ contains
             if ( config_use_tracerGroup ) then
                zero_surface_flux = .true.
                dtuse = dt
+               layerThickEdgeLcl => layerThickEdge
                layerThicknessLcl => layerThickness
                zMidLcl => zMid
                vertAleTransportTopLcl => vertAleTransportTop
@@ -633,17 +634,21 @@ contains
                   active_tracers = trim(groupItr%memberName) == 'activeTracers'
                   if (active_tracers) then
                      if (poolidx /= 1) print *, 'amb> passive must come after active'
-                     call amb_accum(layerThicknessLcl, zMidLcl, normalThicknessFlux, vertAleTransportTopLcl)
+                     call amb_accum(layerThicknessLcl, layerThickEdgeLcl, zMidLcl, &
+                          normalThicknessFlux, vertAleTransportTopLcl)
                   else
                      if (trim(groupItr % memberName) == 'ecosysTracers') then
                         modifiedGroupName = trim(groupItr % memberName) // "SurfaceFlux"
-                        call mpas_pool_get_array(tracersSurfaceFluxPool, trim(modifiedGroupName), tracerGroupSurfaceFlux)
-                        call ocn_tracer_ecosys_surface_flux_accumulate_fluxes(forcingPool, nCellsSolve, tracerGroupSurfaceFlux)
+                        call mpas_pool_get_array(tracersSurfaceFluxPool, &
+                             trim(modifiedGroupName), tracerGroupSurfaceFlux)
+                        call ocn_tracer_ecosys_surface_flux_accumulate_fluxes(forcingPool, &
+                             nCellsSolve, tracerGroupSurfaceFlux)
                         zero_surface_flux = .false.
                      end if
                      if (.not. amb_is_tracer_step()) cycle
                      dtuse = amb_get_supercycle()*dt
-                     call amb_fill(layerThicknessLcl, zMidLcl, normalThicknessFlux, vertAleTransportTopLcl)
+                     call amb_fill(layerThicknessLcl, layerThickEdgeLcl, zMidLcl, &
+                          normalThicknessFlux, vertAleTransportTopLcl)
                   end if
                end if
 
@@ -903,7 +908,7 @@ contains
                     !$omp end parallel
                  endif
                endif
-               call ocn_tracer_hmix_tend(meshPool, layerThickEdge, layerThicknessLcl, zMidLcl, tracerGroup, &
+               call ocn_tracer_hmix_tend(meshPool, layerThickEdgeLcl, layerThicknessLcl, zMidLcl, tracerGroup, &
                                          RediKappa, slopeTriadUp, slopeTriadDown, dtuse, isActiveTracer, &
                                          RediKappaSfcTaper, RediKappaScaling, rediLimiterCount, tracerGroupTend, err)
 
