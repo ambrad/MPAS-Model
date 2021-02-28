@@ -30,7 +30,7 @@ module amb
   real(RKIND), dimension(:,:), allocatable :: &
        accumNormalThicknessFlux
 
-  real(RKIND) :: carbon_diags(4)
+  real(RKIND) :: carbon_diags(5)
 
 contains
 
@@ -142,6 +142,11 @@ contains
        layerThickness0(:,:) = layerThickness(:,:)
     end if
   end subroutine amb_set_layerThickness0
+
+  subroutine amb_get_layerThickness0(layerThickness)
+    real(RKIND), pointer, intent(out) :: layerThickness(:,:)
+    layerThickness => layerThickness0
+  end subroutine amb_get_layerThickness0
 
   subroutine amb_accum(layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, &
        vertAleTransportTop)
@@ -301,7 +306,8 @@ contains
   !   carbon_diags = (tendencies
   !                   calcToSed + pocToSed
   !                   surfaceFlux
-  !                   diag_Jint_Ctot)
+  !                   diag_Jint_Ctot,
+  !                   diff(hnew qnew - hprev qprev)/dt)
 
   function amb_diag_carbon() result (u)
     logical :: u
@@ -315,6 +321,14 @@ contains
     if (.not. diag_carbon) return
     call mpi_allreduce(tot, carbon_diags(1), 1, MPI_REAL8, MPI_SUM, comm_global, ierr)
   end subroutine amb_c_reduce_ecosys_tends
+
+  subroutine amb_c_reduce_ecosys_diffs(tot)
+    real(RKIND), intent(in) :: tot
+    integer :: ierr
+
+    if (.not. diag_carbon) return
+    call mpi_allreduce(tot, carbon_diags(5), 1, MPI_REAL8, MPI_SUM, comm_global, ierr)
+  end subroutine amb_c_reduce_ecosys_diffs
 
   subroutine amb_c_reduce_ecosys_sfc_fluxes(tot)
     real(RKIND), intent(in) :: tot
@@ -340,8 +354,10 @@ contains
   subroutine amb_c_print()
     if (.not. amroot) return
     if (.not. diag_carbon) return
-    print '(a,5(es11.3))', 'amb> C', carbon_diags(1:4), &
+    print '(a,5(es11.3))', 'amb> Ctend', carbon_diags(1:4), &
          carbon_diags(1) + carbon_diags(2) - carbon_diags(3) + carbon_diags(4)
+    print '(a,5(es11.3))', 'amb> Cdiff', carbon_diags(5), carbon_diags(2:4), &
+         carbon_diags(5) + carbon_diags(2) - carbon_diags(3) + carbon_diags(4)
   end subroutine amb_c_print
 
 end module amb

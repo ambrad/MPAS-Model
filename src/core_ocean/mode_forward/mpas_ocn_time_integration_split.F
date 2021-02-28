@@ -45,7 +45,7 @@ module ocn_time_integration_split
 
    use amb
    use ocn_tracer_ecosys, only: ocn_tracer_ecosys_sum_tends
-   use act
+   !use act
 
    implicit none
    private
@@ -305,7 +305,7 @@ module ocn_time_integration_split
 
          ! Initialize * variables that are used to compute baroclinic tendencies below.
 
-         call act_velocity(meshPool, daysSinceStartOfSim, dt/2, normalVelocityCur)
+         !call act_velocity(meshPool, daysSinceStartOfSim, dt/2, normalVelocityCur)
 
          !$omp parallel
          !$omp do schedule(runtime) private(k)
@@ -1760,7 +1760,6 @@ module ocn_time_integration_split
                            if (trim(groupItr % memberName) == 'ecosysTracers') then
                               call ocn_tracer_ecosys_sum_tends(tracersGroupTend, &
                                    nCellsArray(1), maxLevelCell, areaCell)
-                              call amb_c_print()
                            end if
                         end if
 
@@ -1945,6 +1944,16 @@ module ocn_time_integration_split
                if (.not. is_active .and. .not. amb_is_tracer_step()) cycle
             end if
             call mpas_dmpar_field_halo_exch(domain, groupItr % memberName, timeLevel=2)
+            if (.true. .and. trim(groupItr % memberName) == 'ecosysTracers') then
+               call mpas_pool_get_array(tracersPool, groupItr%memberName, &
+                    tracersGroupCur, 1)
+               call mpas_pool_get_array(tracersPool, groupItr%memberName, &
+                    tracersGroupNew, 2)
+               call ocn_tracer_ecosys_sum_diffs(dt, nCellsArray(1), maxLevelCell, &
+                    areaCell, layerThicknessCur, layerThicknessNew, tracersGroupCur, &
+                    tracersGroupNew)
+               call amb_c_print()
+            end if
          end if
       end do
       call mpas_timer_stop('se vmix halos')

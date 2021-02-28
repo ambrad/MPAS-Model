@@ -60,7 +60,7 @@ module ocn_tracer_ecosys
              ocn_get_ecosysData,  &
              ocn_ecosys_forcing_write_restart,  &
              ocn_tracer_ecosys_init, &
-             ocn_tracer_ecosys_sum_tends
+             ocn_tracer_ecosys_sum_tends, ocn_tracer_ecosys_sum_diffs
 
    integer, public:: &
       numColumnsMax
@@ -2361,6 +2361,49 @@ contains
       end do
       call amb_c_reduce_ecosys_tends(tot)
     end subroutine ocn_tracer_ecosys_sum_tends
+
+    subroutine ocn_tracer_ecosys_sum_diffs(dt, nCells, maxLevelCell, areaCell, &
+         hprev, hnew, qprev, qnew)
+      integer, dimension(:), intent(in) :: maxLevelCell
+      real (kind=RKIND), intent(in) :: dt
+      real (kind=RKIND), dimension(:), intent(in) :: areaCell
+      real (kind=RKIND), dimension(:,:), target, intent(in) :: hprev, hnew
+      real (kind=RKIND), dimension(:,:,:), intent(in) :: qprev, qnew
+      integer, intent(in) :: nCells
+
+      integer :: ic, il
+      real(RKIND) :: tot
+      real(RKIND), pointer :: h0(:,:)
+
+      if (.not. amb_diag_carbon()) return
+      h0 => hprev
+      if (amb_use()) call amb_get_layerThickness0(h0)
+      tot = 0
+      do ic = 1, nCells
+         do il = 1, maxLevelCell(ic)
+            tot = tot + areaCell(ic)*( &
+                 diff(BGC_indices%dic_ind,il,ic) + &
+                 diff(BGC_indices%doc_ind,il,ic) + &
+                 diff(BGC_indices%zooC_ind,il,ic) + &
+                 diff(BGC_indices%spC_ind,il,ic) + &
+                 diff(BGC_indices%diatC_ind,il,ic) + &
+                 diff(BGC_indices%diazC_ind,il,ic) + &
+                 diff(BGC_indices%phaeoC_ind,il,ic) + &
+                 diff(BGC_indices%spCaCO3_ind,il,ic))
+         end do
+      end do
+      tot = tot/dt
+      if (amb_use()) tot = tot/amb_get_supercycle()
+      call amb_c_reduce_ecosys_diffs(tot)
+
+    contains
+
+      function diff(idx, il, ic) result(d)
+        integer, intent(in) :: idx, il, ic
+        real(RKIND) :: d
+        d = hnew(il,ic)*qnew(idx,il,ic) - h0(il,ic)*qprev(idx,il,ic)
+      end function diff
+    end subroutine ocn_tracer_ecosys_sum_diffs
 
 end module ocn_tracer_ecosys
 
