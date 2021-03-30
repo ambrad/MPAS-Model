@@ -3,25 +3,38 @@ module amb
   use mpi
 
   implicit none
+  private
 
+  ! settings
   integer :: supercycle
   logical :: sc_use, subc_params
-
-  logical :: first = .true.
+  ! initialization
+  logical :: inited = .false.
   integer :: mpirank, comm_global
   logical :: amroot
-
+  ! debug
   integer, parameter :: ndbgq = 3, verbose = 0
-
+  ! state
   integer :: timestep, split_explicit_step, n_ts_iter
-
   real(RKIND), dimension(:,:), allocatable, target :: &
        layerThickness0, accumLayerThickness, accumLayerThicknessEdge, &
        accumZMid, accumVertAleTransportTop
   real(RKIND), dimension(:,:), allocatable :: &
        accumNormalThicknessFlux
 
-  real(RKIND) :: carbon_diags(4)
+  public :: &
+       amb_use, &
+       amb_subc_params, &
+       amb_set_timestep, &
+       amb_set_split_explicit_step, &
+       amb_get_timestep, &
+       amb_get_supercycle, &
+       amb_is_tracer_step, &
+       amb_set_layerThickness0, &
+       amb_accum, &
+       amb_fill, &
+       amb_update, &
+       amb_check_debug_tracers
 
 contains
 
@@ -79,8 +92,8 @@ contains
     character (len=255) :: env_str
     integer :: tmp
 
-    if (.not. first) return
-    first = .false.
+    if (inited) return
+    inited = .true.
 
     if (present(comm)) then
        comm_global = comm
