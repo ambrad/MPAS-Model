@@ -330,6 +330,16 @@ contains
     call mpi_allreduce(tot, carbon_diags(5), 1, MPI_REAL8, MPI_SUM, comm_global, ierr)
   end subroutine amb_c_reduce_ecosys_diffs
 
+  subroutine amb_c_reduce_ecosys_diff_vmix(tot)
+    real(RKIND), intent(in) :: tot(3)
+    integer :: ierr
+    real(RKIND) :: totg(3)
+
+    if (.not. diag_carbon) return
+    call mpi_allreduce(tot, totg, 3, MPI_REAL8, MPI_SUM, comm_global, ierr)
+    if (amroot) print '(a,3(es23.16))', 'amb> Cvmix', totg
+  end subroutine amb_c_reduce_ecosys_diff_vmix
+
   subroutine amb_c_reduce_ecosys_sfc_fluxes(tot)
     real(RKIND), intent(in) :: tot
     integer :: ierr

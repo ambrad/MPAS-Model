@@ -44,7 +44,7 @@ module ocn_time_integration_split
    use ocn_effective_density_in_land_ice
 
    use amb
-   use ocn_tracer_ecosys, only: ocn_tracer_ecosys_sum_tends
+   use ocn_tracer_ecosys!, only: ocn_tracer_ecosys_sum_tends
    !use act
 
    implicit none
@@ -1760,6 +1760,10 @@ module ocn_time_integration_split
                            if (trim(groupItr % memberName) == 'ecosysTracers') then
                               call ocn_tracer_ecosys_sum_tends(tracersGroupTend, &
                                    nCellsArray(1), maxLevelCell, areaCell)
+                              call ocn_tracer_ecosys_sum_diffs(dt, nCellsArray(1), maxLevelCell, &
+                                   areaCell, layerThicknessCur, layerThicknessNew, tracersGroupCur, &
+                                   tracersGroupNew)
+                              call amb_c_print()
                            end if
                         end if
 
@@ -1906,6 +1910,17 @@ module ocn_time_integration_split
 
       call mpas_dmpar_field_halo_exch(domain, 'surfaceFrictionVelocity')
 
+      call mpas_pool_begin_iteration(tracersPool)
+      do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
+         if (trim(groupItr % memberName) == 'ecosysTracers') then
+            call mpas_pool_get_array(tracersPool, groupItr%memberName, &
+                 tracersGroupCur, 1)
+            call mpas_pool_get_array(tracersPool, groupItr%memberName, &
+                 tracersGroupNew, 2)
+            tracersGroupCur = tracersGroupNew
+         end if
+      end do
+
       block => domain % blocklist
       do while(associated(block))
         call mpas_pool_get_subpool(block % structs, 'state', statePool)
@@ -1921,6 +1936,18 @@ module ocn_time_integration_split
         call ocn_vmix_implicit(dt, meshPool, statePool, forcingPool, scratchPool, err, 2)
 
         block => block % next
+      end do
+
+      call mpas_pool_begin_iteration(tracersPool)
+      do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
+         if (trim(groupItr % memberName) == 'ecosysTracers') then
+            call mpas_pool_get_array(tracersPool, groupItr%memberName, &
+                 tracersGroupCur, 1)
+            call mpas_pool_get_array(tracersPool, groupItr%memberName, &
+                 tracersGroupNew, 2)
+            call ocn_tracer_ecosys_sum_diff_vmix(dt, nCellsArray(1), maxLevelCell, &
+                 areaCell, layerThicknessNew, tracersGroupCur, tracersGroupNew)
+         end if
       end do
 
       ! Update halo on u and tracers, which were just updated for implicit vertical mixing.  If not done,
@@ -1944,7 +1971,7 @@ module ocn_time_integration_split
                if (.not. is_active .and. .not. amb_is_tracer_step()) cycle
             end if
             call mpas_dmpar_field_halo_exch(domain, groupItr % memberName, timeLevel=2)
-            if (.true. .and. trim(groupItr % memberName) == 'ecosysTracers') then
+            if (.false. .and. trim(groupItr % memberName) == 'ecosysTracers') then
                call mpas_pool_get_array(tracersPool, groupItr%memberName, &
                     tracersGroupCur, 1)
                call mpas_pool_get_array(tracersPool, groupItr%memberName, &
