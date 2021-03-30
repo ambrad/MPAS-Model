@@ -1,20 +1,11 @@
 module amb
-  ! advection call stack starting with top-level loop:
-  ! ~/mpas/mpas/src/core_ocean/mode_forward/mpas_ocn_forward_mode.F
-  ! ~/mpas/mpas/src/core_ocean/mode_forward/mpas_ocn_time_integration.F
-  ! ~/mpas/mpas/src/core_ocean/mode_forward/mpas_ocn_time_integration_split.F
-  ! ~/mpas/mpas/src/core_ocean/shared/mpas_ocn_tendency.F
-  ! ~/mpas/mpas/src/core_ocean/shared/mpas_ocn_tracer_advection.F
-  
   use mpas_kind_types
   use mpi
 
   implicit none
 
-  ! 3 for baro10km with 2hr dt
-  ! 2 for baro4km with 1hr dt
   integer :: supercycle
-  logical :: sc_use, subc_params, diag_carbon
+  logical :: sc_use, subc_params
 
   logical :: first = .true.
   integer :: mpirank, comm_global
@@ -116,16 +107,10 @@ contains
           subc_params = tmp /= 0
        end if
     end if
-    diag_carbon = .false.
-    call get_environment_variable("amb_diag_carbon", env_str, status=err)
-    if (err /= 1) then
-       read(env_str, '(i)', iostat=err) tmp
-       diag_carbon = tmp /= 0
-    end if
     
     if (amroot) then
        print '(a,l,a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
-            ' subc params', subc_params, ' sc', supercycle, ' diagC', diag_carbon
+            ' subc params', subc_params, ' sc', supercycle
     end if
   end subroutine amb_init
 
@@ -294,54 +279,5 @@ contains
        end if
     end if
   end subroutine amb_check_debug_tracers
-
-  !!! carbon conservation
-  !   Inputs to reduction routines are already reduced over nCellsSolve w/in
-  ! this rank.
-  !   carbon_diags = (tendencies
-  !                   calcToSed + pocToSed
-  !                   surfaceFlux
-  !                   diag_Jint_Ctot)
-
-  function amb_diag_carbon() result (u)
-    logical :: u
-    u = diag_carbon
-  end function amb_diag_carbon
-
-  subroutine amb_c_reduce_ecosys_tends(tot)
-    real(RKIND), intent(in) :: tot
-    integer :: ierr
-
-    if (.not. diag_carbon) return
-    call mpi_allreduce(tot, carbon_diags(1), 1, MPI_REAL8, MPI_SUM, comm_global, ierr)
-  end subroutine amb_c_reduce_ecosys_tends
-
-  subroutine amb_c_reduce_ecosys_sfc_fluxes(tot)
-    real(RKIND), intent(in) :: tot
-    integer :: ierr
-
-    if (.not. diag_carbon) return
-    call mpi_allreduce(tot, carbon_diags(3), 1, MPI_REAL8, MPI_SUM, comm_global, ierr)
-  end subroutine amb_c_reduce_ecosys_sfc_fluxes
-
-  subroutine amb_c_reduce_ecosys_diags(calc_to_sed, poc_to_sed, diag_Jint_Ctot)
-    real(RKIND), intent(in) :: calc_to_sed, poc_to_sed, diag_Jint_Ctot
-    integer :: ierr
-    real(RKIND) :: send(2), recv(2)
-
-    if (.not. diag_carbon) return
-    send(1) = calc_to_sed + poc_to_sed
-    send(2) = diag_Jint_Ctot
-    call mpi_allreduce(send, recv, 2, MPI_REAL8, MPI_SUM, comm_global, ierr)
-    carbon_diags(2) = recv(1)
-    carbon_diags(4) = recv(2)
-  end subroutine amb_c_reduce_ecosys_diags
-
-  subroutine amb_c_print()
-    if (.not. amroot) return
-    if (.not. diag_carbon) return
-    print '(a,5(es11.3))', 'amb> C', carbon_diags(1:4), &
-         carbon_diags(1) + carbon_diags(2) - carbon_diags(3) + carbon_diags(4)
-  end subroutine amb_c_print
 
 end module amb

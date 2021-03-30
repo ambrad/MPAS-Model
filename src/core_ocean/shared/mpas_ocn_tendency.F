@@ -587,8 +587,6 @@ contains
       call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
       call mpas_pool_get_dimension(meshPool, 'nEdges', nEdges)
 
-      if (amb_diag_carbon()) call mpas_pool_get_array(meshPool, 'areaCell', areaCell)
-
       if(config_disable_tr_all_tend) return
 
       call mpas_timer_start("ocn_tend_tracer")

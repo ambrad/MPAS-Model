@@ -59,8 +59,7 @@ module ocn_tracer_ecosys
              ocn_tracer_ecosys_surface_flux_compute,  &
              ocn_get_ecosysData,  &
              ocn_ecosys_forcing_write_restart,  &
-             ocn_tracer_ecosys_init, &
-             ocn_tracer_ecosys_sum_tends
+             ocn_tracer_ecosys_init
 
    integer, public:: &
       numColumnsMax
@@ -518,18 +517,6 @@ contains
          do iCell=1,nCellsSolve
             call wrap_SourceSink(ecosysTracers(:,:,iCell), 0.0_RKIND, 1.0_RKIND)
          end do
-      end if
-
-      if (amb_diag_carbon()) then
-         diag_carbon = 0
-         do iCell = 1, nCellsSolve
-            do il = 1, maxLevelCell(iCell)
-               diag_carbon(1) = diag_carbon(1) + areaCell(iCell)*ecosys_diag_calcToSed(il,iCell)
-               diag_carbon(2) = diag_carbon(2) + areaCell(iCell)*ecosys_diag_pocToSed(il,iCell)
-            end do
-            diag_carbon(3) = diag_carbon(3) + areaCell(iCell)*ecosys_diag_Jint_Ctot(iCell)
-         end do
-         call amb_c_reduce_ecosys_diags(diag_carbon(1), diag_carbon(2), diag_carbon(3))
       end if
 
       call mpas_timer_stop("ecosys source-sink")
@@ -1547,22 +1534,6 @@ contains
 
       enddo  !  iCell
 
-      if (amb_diag_carbon()) then
-         ! DIC DOC zooC spC diatC diazC phaeoC
-         rwrk = 0
-         do iCell = 1,nCellsSolve
-            rwrk = rwrk + areaCell(iCell)*( &
-                 ecosysSurfaceFlux(ecosysIndices%dic_ind,iCell) + &
-                 ecosysSurfaceFlux(ecosysIndices%doc_ind,iCell) + &
-                 ecosysSurfaceFlux(ecosysIndices%zooC_ind,iCell) + &
-                 ecosysSurfaceFlux(ecosysIndices%spC_ind,iCell) + &
-                 ecosysSurfaceFlux(ecosysIndices%diatC_ind,iCell) + &
-                 ecosysSurfaceFlux(ecosysIndices%diazC_ind,iCell) + &
-                 ecosysSurfaceFlux(ecosysIndices%phaeoC_ind,iCell))
-         end do
-         call amb_c_reduce_ecosys_sfc_fluxes(rwrk)
-      end if
-
       call mpas_timer_stop("ecosys surface flux")
 
    !--------------------------------------------------------------------
@@ -2333,34 +2304,6 @@ contains
       call MPAS_forcing_write_restart_times(forcingGroupHead)
 
     end subroutine ocn_ecosys_forcing_write_restart!}}}
-
-    !amb
-    subroutine ocn_tracer_ecosys_sum_tends(tend, nCells, maxLevelCell, areaCell)
-      integer, dimension(:), intent(in) :: maxLevelCell
-      real (kind=RKIND), dimension(:,:,:), intent(in) :: tend
-      real (kind=RKIND), dimension(:), intent(in) :: areaCell
-      integer, intent(in) :: nCells
-
-      integer :: ic, il
-      real(RKIND) :: tot
-
-      if (.not. amb_diag_carbon()) return
-      tot = 0
-      do ic = 1, nCells
-         do il = 1, maxLevelCell(ic)
-            tot = tot + areaCell(ic)*( &
-                 tend(BGC_indices%dic_ind,il,ic) + &
-                 tend(BGC_indices%doc_ind,il,ic) + &
-                 tend(BGC_indices%zooC_ind,il,ic) + &
-                 tend(BGC_indices%spC_ind,il,ic) + &
-                 tend(BGC_indices%diatC_ind,il,ic) + &
-                 tend(BGC_indices%diazC_ind,il,ic) + &
-                 tend(BGC_indices%phaeoC_ind,il,ic) + &
-                 tend(BGC_indices%spCaCO3_ind,il,ic))
-         end do
-      end do
-      call amb_c_reduce_ecosys_tends(tot)
-    end subroutine ocn_tracer_ecosys_sum_tends
 
 end module ocn_tracer_ecosys
 
