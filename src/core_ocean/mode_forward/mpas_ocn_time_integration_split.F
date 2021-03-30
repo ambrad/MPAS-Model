@@ -45,7 +45,7 @@ module ocn_time_integration_split
 
    use amb
    use ocn_tracer_ecosys, only: ocn_tracer_ecosys_sum_tends
-   use act
+   !use act
 
    implicit none
    private
@@ -305,7 +305,7 @@ module ocn_time_integration_split
 
          ! Initialize * variables that are used to compute baroclinic tendencies below.
 
-         call act_velocity(meshPool, daysSinceStartOfSim, dt/2, normalVelocityCur)
+         !call act_velocity(meshPool, daysSinceStartOfSim, dt/2, normalVelocityCur)
 
          !$omp parallel
          !$omp do schedule(runtime) private(k)
