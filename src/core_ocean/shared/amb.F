@@ -108,7 +108,8 @@ contains
 
     sc_use = .false.
     supercycle = config_ecosysTracers_supercycle_timestep
-    if (supercycle) subc_params = config_ecosysTracers_subcycle_param
+    sc_use = supercycle > 1
+    if (sc_use) subc_params = config_ecosysTracers_subcycle_param
     
     if (amroot) then
        print '(a,l,a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
