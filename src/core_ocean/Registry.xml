@@ -907,6 +907,10 @@
 					description="If .true. then fluxes are limited to produce a monotonic advection scheme"
 					possible_values=".true. and .false."
 		/>
+		<nml_option name="config_passive_tracers_supercycle_timestep" type="integer" default_value="0" units="unitless"
+			description="if value > 1, then the passive tracer time step is this value times the baroclinic time step"
+			possible_values="Any positive integer value greater than or equal to 0."
+		/>
 	</nml_record>
 	<nml_record name="bottom_drag" mode="forward">
 		<nml_option name="config_use_implicit_bottom_drag" type="logical" default_value=".true." units="unitless"

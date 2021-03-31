@@ -107,14 +107,14 @@ contains
     amroot = mpirank == 0
 
     sc_use = .false.
-    supercycle = config_ecosysTracers_supercycle_timestep
+    supercycle = config_passive_tracers_supercycle_timestep
     sc_use = supercycle > 1
     if (sc_use) subc_params = config_ecosysTracers_subcycle_param
     
     if (amroot) then
        print '(a,l,a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
             ' subc params', subc_params, ' sc', supercycle
-       print *, 'amb> config: ', config_ecosysTracers_supercycle_timestep, config_ecosysTracers_subcycle_param
+       print *, 'amb> config: ', config_passive_tracers_supercycle_timestep, config_ecosysTracers_subcycle_param
     end if
   end subroutine amb_init
 
