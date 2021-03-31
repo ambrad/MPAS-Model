@@ -107,7 +107,7 @@ contains
          .or. trim(config_time_integrator) == 'unsplit_explicit')
     
     if (amroot) then
-       print '(a,l,a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
+       print '(a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
             ' sc', supercycle, ' subcyc', config_ecosysTracers_subcycle_param
     end if
   end subroutine amb_init
@@ -126,10 +126,12 @@ contains
     end if
   end subroutine amb_set_layerThickness0
 
-  subroutine amb_accum(layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, &
+  subroutine amb_accum(tendPool, layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, &
        vertAleTransportTop)
+    type (mpas_pool_type), intent(inout) :: tendPool
     real(RKIND), dimension(:,:), intent(in) :: &
          layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, vertAleTransportTop
+    real (kind=RKIND), dimension(:,:), pointer :: test, t1
 
     if (split_explicit_step /= n_ts_iter) return
 

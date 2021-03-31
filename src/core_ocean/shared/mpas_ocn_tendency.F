@@ -632,7 +632,7 @@ contains
                   active_tracers = trim(groupItr%memberName) == 'activeTracers'
                   if (active_tracers) then
                      if (poolidx /= 1) print *, 'amb> passive must come after active'
-                     call amb_accum(layerThicknessLcl, layerThickEdgeLcl, zMidLcl, &
+                     call amb_accum(tendPool, layerThicknessLcl, layerThickEdgeLcl, zMidLcl, &
                           normalThicknessFlux, vertAleTransportTopLcl)
                   else
                      if (trim(groupItr % memberName) == 'ecosysTracers') then

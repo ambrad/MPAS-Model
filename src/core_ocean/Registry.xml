@@ -1336,6 +1336,7 @@
 		<package name="tracerBudget" description="This package controls variables that record the tracer budget."/>
 		<package name="gm" description="This package is for GM variables, which are only needed at lower resolutions."/>
 		<package name="tidalPotentialForcingPKG" description="This package controls variables required for tidal potential forcing"/>
+    <package name="passiveTracerSupercyclePKG" description="This package controls variables required to supercycle passive tracers over the baroclinic timestep."/>
 	</packages>
 
 	<streams>
@@ -2247,6 +2248,11 @@
 			 description="time tendency of low frequency-filtered divergence"
 			 packages="thicknessFilter"
 		/>
+    <!-- Fields for passive tracer supercycling -->
+    <var name="passiveTracerTestArray" type="real" dimensions="nVertLevels nCells" units="m"
+      description="Test"
+      packages="passiveTracerSupercyclePKG"
+    />
 	</var_struct>
 	<var_struct name="diagnostics" time_levs="1">
 		<var name="xtime" type="text" dimensions="Time" units="unitless"
