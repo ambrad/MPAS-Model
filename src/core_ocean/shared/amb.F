@@ -102,7 +102,9 @@ contains
 
     sc_use = .false.
     supercycle = config_passive_tracers_supercycle_timestep
-    sc_use = supercycle > 1
+    sc_use = supercycle > 1 .and. &
+         (    trim(config_time_integrator) == 'split_explicit'   &
+         .or. trim(config_time_integrator) == 'unsplit_explicit')
     
     if (amroot) then
        print '(a,l,a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
