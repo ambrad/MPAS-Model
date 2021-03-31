@@ -358,7 +358,7 @@ contains
       subcycle = .false.
       supercycle = 1
       if (amb_use()) then
-         subcycle = amb_subc_params()
+         subcycle = config_ecosysTracers_subcycle_param
          if (subcycle) supercycle = amb_get_supercycle()
       end if
 

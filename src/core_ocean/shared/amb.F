@@ -8,7 +8,7 @@ module amb
 
   ! settings
   integer :: supercycle
-  logical :: sc_use, subc_params
+  logical :: sc_use
   ! initialization
   logical :: inited = .false.
   integer :: mpirank, comm_global
@@ -25,7 +25,6 @@ module amb
 
   public :: &
        amb_use, &
-       amb_subc_params, &
        amb_set_timestep, &
        amb_set_split_explicit_step, &
        amb_get_timestep, &
@@ -45,11 +44,6 @@ contains
     logical :: u
     u = sc_use
   end function amb_use
-
-  function amb_subc_params() result (u)
-    logical :: u
-    u = subc_params
-  end function amb_subc_params
 
   subroutine amb_set_timestep(comm)
     integer, intent(in) :: comm
@@ -109,12 +103,10 @@ contains
     sc_use = .false.
     supercycle = config_passive_tracers_supercycle_timestep
     sc_use = supercycle > 1
-    if (sc_use) subc_params = config_ecosysTracers_subcycle_param
     
     if (amroot) then
        print '(a,l,a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
-            ' subc params', subc_params, ' sc', supercycle
-       print *, 'amb> config: ', config_passive_tracers_supercycle_timestep, config_ecosysTracers_subcycle_param
+            ' sc', supercycle, ' subcyc', config_ecosysTracers_subcycle_param
     end if
   end subroutine amb_init
 
