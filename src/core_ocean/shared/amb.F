@@ -1,5 +1,6 @@
 module amb
   use mpas_kind_types
+  use ocn_config
   use mpi
 
   implicit none
@@ -34,7 +35,9 @@ module amb
        amb_accum, &
        amb_fill, &
        amb_update, &
-       amb_check_debug_tracers
+       amb_check_debug_tracers, &
+       ! for now
+       amb_init, amb_amroot
 
 contains
 
@@ -89,8 +92,6 @@ contains
     integer, intent(in), optional :: comm
 
     integer :: err
-    character (len=255) :: env_str
-    integer :: tmp
 
     if (inited) return
     inited = .true.
@@ -106,24 +107,13 @@ contains
     amroot = mpirank == 0
 
     sc_use = .false.
-    supercycle = 1
-    call get_environment_variable("amb_sc", env_str, status=err)
-    if (err /= 1) then
-       read(env_str, '(i)', iostat=err) supercycle
-       sc_use = supercycle > 0!1
-    end if
-    subc_params = sc_use
-    if (sc_use) then
-       call get_environment_variable("amb_subc_params", env_str, status=err)
-       if (err /= 1) then
-          read(env_str, '(i)', iostat=err) tmp
-          subc_params = tmp /= 0
-       end if
-    end if
+    supercycle = config_ecosysTracers_supercycle_timestep
+    if (supercycle) subc_params = config_ecosysTracers_subcycle_param
     
     if (amroot) then
        print '(a,l,a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
             ' subc params', subc_params, ' sc', supercycle
+       print *, 'amb> config: ', config_ecosysTracers_supercycle_timestep, config_ecosysTracers_subcycle_param
     end if
   end subroutine amb_init
 
