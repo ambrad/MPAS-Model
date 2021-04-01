@@ -109,9 +109,9 @@ contains
 
   subroutine amb_set_layerThickness0(tendPool, layerThickness)
     type (mpas_pool_type), intent(inout) :: tendPool
-    real(RKIND), intent(in) :: layerThickness(:,:)
+    real (kind=RKIND), intent(in) :: layerThickness(:,:)
 
-    real(RKIND), pointer :: layerThickness0(:,:)
+    real (kind=RKIND), pointer :: layerThickness0(:,:)
 
     if (split_explicit_step /= n_ts_iter) return
 
@@ -124,11 +124,11 @@ contains
   subroutine amb_accum(tendPool, layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, &
        vertAleTransportTop)
     type (mpas_pool_type), intent(inout) :: tendPool
-    real(RKIND), dimension(:,:), intent(in) :: &
+    real (kind=RKIND), dimension(:,:), intent(in) :: &
          layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, vertAleTransportTop
     real (kind=RKIND), dimension(:,:), pointer :: test, t1
 
-    real(RKIND), dimension(:,:), pointer :: accumLayerThickness, accumLayerThicknessEdge, &
+    real (kind=RKIND), dimension(:,:), pointer :: accumLayerThickness, accumLayerThicknessEdge, &
          accumZMid, accumNormalThicknessFlux, accumVertAleTransportTop
 
     if (split_explicit_step /= n_ts_iter) return
@@ -167,11 +167,11 @@ contains
   subroutine amb_fill(tendPool, layerThickness, layerThicknessEdge, zMid, &
        normalThicknessFlux, vertAleTransportTop)
     type (mpas_pool_type), intent(inout) :: tendPool
-    real(RKIND), intent(out) :: normalThicknessFlux(:,:)
-    real(RKIND), intent(out), dimension(:,:), pointer :: layerThickness, &
+    real (kind=RKIND), intent(out) :: normalThicknessFlux(:,:)
+    real (kind=RKIND), intent(out), dimension(:,:), pointer :: layerThickness, &
          layerThicknessEdge, zMid, vertAleTransportTop
 
-    real(RKIND), dimension(:,:), pointer :: accumNormalThicknessFlux
+    real (kind=RKIND), dimension(:,:), pointer :: accumNormalThicknessFlux
 
     if (split_explicit_step /= n_ts_iter) print *, 'amb> amb_fill: should not be here'
     if (amroot .and. verbose > 0) print *,'amb> fill',timestep,split_explicit_step
@@ -187,10 +187,10 @@ contains
   subroutine amb_update(tendPool, maxLevelCell, nCells, dt, tcur, ttend, lyrnew, tnew)
     type (mpas_pool_type), intent(inout) :: tendPool
     integer, intent(in) :: maxLevelCell(:), nCells
-    real(RKIND), intent(in) :: dt, tcur(:,:,:), ttend(:,:,:), lyrnew(:,:)
-    real(RKIND), intent(out) :: tnew(:,:,:)
+    real (kind=RKIND), intent(in) :: dt, tcur(:,:,:), ttend(:,:,:), lyrnew(:,:)
+    real (kind=RKIND), intent(out) :: tnew(:,:,:)
 
-    real(RKIND), pointer :: layerThickness0(:,:)
+    real (kind=RKIND), pointer :: layerThickness0(:,:)
     integer :: ic, k
 
     if (modulo(timestep, supercycle) /= 0) then
@@ -210,17 +210,17 @@ contains
   subroutine amb_check_debug_tracers(tendPool, maxLevelCell, nCells, areaCell, h, q)
     type (mpas_pool_type), intent(inout) :: tendPool
     integer, intent(in) :: maxLevelCell(:), nCells
-    real(RKIND), intent(in) :: areaCell(:), q(:,:,:)
-    real(RKIND), intent(in), target :: h(:,:)
+    real (kind=RKIND), intent(in) :: areaCell(:), q(:,:,:)
+    real (kind=RKIND), intent(in), target :: h(:,:)
 
     integer, parameter :: conout = 999
 
-    real(RKIND), save :: overall_maxerr = 0, mass0(ndbgq)
+    real (kind=RKIND), save :: overall_maxerr = 0, mass0(ndbgq)
     integer, save :: consistency_output_cnt = 0, next_timestep = 1
 
     integer :: idx, ic, k, iq, ierr
-    real(RKIND) :: maxerr, mass, send(ndbgq), recv(ndbgq), err
-    real(RKIND), pointer :: huse(:,:)
+    real (kind=RKIND) :: maxerr, mass, send(ndbgq), recv(ndbgq), err
+    real (kind=RKIND), pointer :: huse(:,:)
 
     if (.false. .and. modulo(timestep-1, 10) == 0) then
        ! Debug tracer 3 mixing ratio is uniformly 42. Check departure from that.
