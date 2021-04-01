@@ -391,7 +391,13 @@ module ocn_time_integration_split
       do split_explicit_step = 1, config_n_ts_iter
          if (amb_use()) then
             call amb_set_split_explicit_step(split_explicit_step, config_n_ts_iter)
-            call amb_set_layerThickness0(layerThicknessCur)
+            block => domain % blocklist
+            do while (associated(block))
+               call mpas_pool_get_array(statePool, 'layerThickness', layerThicknessCur, 1)
+               call mpas_pool_get_subpool(block % structs, 'tend', tendPool)
+               call amb_set_layerThickness0(tendPool, layerThicknessCur)
+               block => block % next
+            end do
          end if
 
          if (config_disable_thick_all_tend .and. config_disable_vel_all_tend .and. config_disable_tr_all_tend) then
@@ -1734,7 +1740,7 @@ module ocn_time_integration_split
                         updated_tracers = .false.
                         if (amb_use()) then
                            if (trim(groupItr % memberName) /= 'activeTracers') then
-                              call amb_update(maxLevelCell, nCells, dt, tracersGroupCur, &
+                              call amb_update(tendPool, maxLevelCell, nCells, dt, tracersGroupCur, &
                                    tracersGroupTend, layerThicknessNew, tracersGroupNew)
                               updated_tracers = .true.
                            end if
@@ -1753,7 +1759,7 @@ module ocn_time_integration_split
                         end if
                         if (.true.) then
                            if (trim(groupItr % memberName) == 'debugTracers') then
-                              call amb_check_debug_tracers(maxLevelCell, nCellsArray(1), &
+                              call amb_check_debug_tracers(tendPool, maxLevelCell, nCellsArray(1), &
                                    areaCell, layerThicknessNew, tracersGroupNew)
                            end if
                         end if

@@ -17,11 +17,6 @@ module amb
   integer, parameter :: ndbgq = 3, verbose = 0
   ! state
   integer :: timestep, split_explicit_step, n_ts_iter
-  real(RKIND), dimension(:,:), allocatable, target :: &
-       layerThickness0, accumLayerThickness, accumLayerThicknessEdge, &
-       accumZMid, accumVertAleTransportTop
-  real(RKIND), dimension(:,:), allocatable :: &
-       accumNormalThicknessFlux
 
   public :: &
        amb_use, &
@@ -112,16 +107,16 @@ contains
     end if
   end subroutine amb_init
 
-  subroutine amb_set_layerThickness0(layerThickness)
+  subroutine amb_set_layerThickness0(tendPool, layerThickness)
+    type (mpas_pool_type), intent(inout) :: tendPool
     real(RKIND), intent(in) :: layerThickness(:,:)
+
+    real(RKIND), pointer :: layerThickness0(:,:)
 
     if (split_explicit_step /= n_ts_iter) return
 
-    if (.not. allocated(layerThickness0)) then
-       allocate(layerThickness0(size(layerThickness,1), size(layerThickness,2)))
-    end if
-
     if (modulo(timestep-1, supercycle) == 0) then
+       call mpas_pool_get_array(tendPool, 'scLayerThickness0', layerThickness0)
        layerThickness0(:,:) = layerThickness(:,:)
     end if
   end subroutine amb_set_layerThickness0
@@ -133,20 +128,16 @@ contains
          layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, vertAleTransportTop
     real (kind=RKIND), dimension(:,:), pointer :: test, t1
 
+    real(RKIND), dimension(:,:), pointer :: accumLayerThickness, accumLayerThicknessEdge, &
+         accumZMid, accumNormalThicknessFlux, accumVertAleTransportTop
+
     if (split_explicit_step /= n_ts_iter) return
 
-    if (.not. allocated(accumNormalThicknessFlux)) then
-       allocate(accumLayerThickness(size(layerThickness,1), &
-                                    size(layerThickness,2)))
-       allocate(accumLayerThicknessEdge(size(layerThicknessEdge,1), &
-                                        size(layerThicknessEdge,2)))
-       allocate(accumZMid(size(zMid,1), size(zMid,2)))
-       allocate(accumNormalThicknessFlux(size(normalThicknessFlux,1), &
-                                         size(normalThicknessFlux,2)))
-       allocate(accumVertAleTransportTop(size(vertAleTransportTop,1), &
-                                         size(vertAleTransportTop,2)))
-       if (amroot .and. verbose > 0) print *,'amb> accum alloc'
-    end if
+    call mpas_pool_get_array(tendPool, 'scAccumLayerThickness', accumLayerThickness)
+    call mpas_pool_get_array(tendPool, 'scAccumLayerThicknessEdge', accumLayerThicknessEdge)
+    call mpas_pool_get_array(tendPool, 'scAccumZMid', accumZMid)
+    call mpas_pool_get_array(tendPool, 'scAccumNormalThicknessFlux', accumNormalThicknessFlux)
+    call mpas_pool_get_array(tendPool, 'scAccumVertAleTransportTop', accumVertAleTransportTop)
 
     if (modulo(timestep-1, supercycle) == 0) then
        if (amroot .and. verbose > 0) print *,'amb> accum zero'
@@ -173,33 +164,40 @@ contains
     end if
   end subroutine amb_accum
 
-  subroutine amb_fill(layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, &
-       vertAleTransportTop)
+  subroutine amb_fill(tendPool, layerThickness, layerThicknessEdge, zMid, &
+       normalThicknessFlux, vertAleTransportTop)
+    type (mpas_pool_type), intent(inout) :: tendPool
     real(RKIND), intent(out) :: normalThicknessFlux(:,:)
     real(RKIND), intent(out), dimension(:,:), pointer :: layerThickness, &
          layerThicknessEdge, zMid, vertAleTransportTop
 
-    if (split_explicit_step /= n_ts_iter) print *, 'amb> amb_fill: should not be here'
+    real(RKIND), dimension(:,:), pointer :: accumNormalThicknessFlux
 
+    if (split_explicit_step /= n_ts_iter) print *, 'amb> amb_fill: should not be here'
     if (amroot .and. verbose > 0) print *,'amb> fill',timestep,split_explicit_step
+
+    call mpas_pool_get_array(tendPool, 'scAccumNormalThicknessFlux', accumNormalThicknessFlux)
     normalThicknessFlux = accumNormalThicknessFlux
-    zMid => accumZMid
-    vertAleTransportTop => accumVertAleTransportTop
-    layerThickness => accumLayerThickness
-    layerThicknessEdge => accumLayerThicknessEdge
+    call mpas_pool_get_array(tendPool, 'scAccumLayerThickness', layerThickness)
+    call mpas_pool_get_array(tendPool, 'scAccumLayerThicknessEdge', layerThicknessEdge)
+    call mpas_pool_get_array(tendPool, 'scAccumZMid', zMid)
+    call mpas_pool_get_array(tendPool, 'scAccumVertAleTransportTop', vertAleTransportTop)
   end subroutine amb_fill
 
-  subroutine amb_update(maxLevelCell, nCells, dt, tcur, ttend, lyrnew, tnew)
+  subroutine amb_update(tendPool, maxLevelCell, nCells, dt, tcur, ttend, lyrnew, tnew)
+    type (mpas_pool_type), intent(inout) :: tendPool
     integer, intent(in) :: maxLevelCell(:), nCells
     real(RKIND), intent(in) :: dt, tcur(:,:,:), ttend(:,:,:), lyrnew(:,:)
     real(RKIND), intent(out) :: tnew(:,:,:)
 
+    real(RKIND), pointer :: layerThickness0(:,:)
     integer :: ic, k
 
     if (modulo(timestep, supercycle) /= 0) then
        tnew(:,:,:) = tcur(:,:,:)
        return
     end if
+    call mpas_pool_get_array(tendPool, 'scLayerThickness0', layerThickness0)
     do ic = 1, nCells
        do k = 1, maxLevelCell(ic)
           tnew(:,k,ic) = (tcur(:,k,ic)*layerThickness0(k,ic) + &
@@ -209,7 +207,8 @@ contains
     end do
   end subroutine amb_update
 
-  subroutine amb_check_debug_tracers(maxLevelCell, nCells, areaCell, h, q)
+  subroutine amb_check_debug_tracers(tendPool, maxLevelCell, nCells, areaCell, h, q)
+    type (mpas_pool_type), intent(inout) :: tendPool
     integer, intent(in) :: maxLevelCell(:), nCells
     real(RKIND), intent(in) :: areaCell(:), q(:,:,:)
     real(RKIND), intent(in), target :: h(:,:)
@@ -243,7 +242,7 @@ contains
 
     if (timestep == next_timestep) then
        if (timestep == 1 .and. sc_use) then
-          huse => layerThickness0
+          call mpas_pool_get_array(tendPool, 'scLayerThickness0', huse)
        else
           huse => h
        end if

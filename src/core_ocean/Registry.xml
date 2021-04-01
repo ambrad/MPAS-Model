@@ -2249,8 +2249,28 @@
 			 packages="thicknessFilter"
 		/>
     <!-- Fields for passive tracer supercycling -->
-    <var name="passiveTracerTestArray" type="real" dimensions="nVertLevels nCells" units="m"
-      description="Test"
+    <var name="scLayerThickness0" type="real" dimensions="nVertLevels nCells" units="m"
+      description="layer thickness at start of supercycled timestep"
+      packages="passiveTracerSupercyclePKG"
+    />
+    <var name="scAccumLayerThickness" type="real" dimensions="nVertLevels nCells" units="m"
+      description="layer thickness accumulated over supercycled tracer timestep"
+      packages="passiveTracerSupercyclePKG"
+    />
+    <var name="scAccumZMid" type="real" dimensions="nVertLevels nCells" units="m"
+      description="zMid accumulated over supercycled tracer timestep"
+      packages="passiveTracerSupercyclePKG"
+    />
+    <var name="scAccumVertAleTransportTop" type="real" dimensions="nVertLevelsP1 nCells" units="m"
+      description="vertAleTransportTop accumulated over supercycled tracer timestep"
+      packages="passiveTracerSupercyclePKG"
+    />
+    <var name="scAccumLayerThicknessEdge" type="real" dimensions="nVertLevels nEdges" units="m"
+      description="layer thickness accumulated over supercycled tracer timestep"
+      packages="passiveTracerSupercyclePKG"
+    />
+    <var name="scAccumNormalThicknessFlux" type="real" dimensions="nVertLevels nEdges" units="m s^{-1}"
+      description="normalThicknessFlux accumulated over supercycled tracer timestep"
       packages="passiveTracerSupercyclePKG"
     />
 	</var_struct>

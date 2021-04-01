@@ -645,7 +645,7 @@ contains
                      end if
                      if (.not. amb_is_tracer_step()) cycle
                      dtuse = amb_get_supercycle()*dt
-                     call amb_fill(layerThicknessLcl, layerThickEdgeLcl, zMidLcl, &
+                     call amb_fill(tendPool, layerThicknessLcl, layerThickEdgeLcl, zMidLcl, &
                           normalThicknessFlux, vertAleTransportTopLcl)
                   end if
                end if
