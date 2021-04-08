@@ -29,7 +29,6 @@ module amb
        amb_accum, &
        amb_fill, &
        amb_update, &
-       amb_check_debug_tracers, &
        ! for now
        amb_init, amb_amroot
 
@@ -107,8 +106,9 @@ contains
     end if
   end subroutine amb_init
 
-  subroutine amb_set_layerThickness0(tendPool, layerThickness)
+  subroutine amb_set_layerThickness0(tendPool, nCells, maxLevelCell, layerThickness)
     type (mpas_pool_type), intent(inout) :: tendPool
+    integer, intent(in) :: nCells, maxLevelCell(:)
     real (kind=RKIND), intent(in) :: layerThickness(:,:)
 
     real (kind=RKIND), pointer :: layerThickness0(:,:)
@@ -121,9 +121,10 @@ contains
     end if
   end subroutine amb_set_layerThickness0
 
-  subroutine amb_accum(tendPool, layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, &
-       vertAleTransportTop)
+  subroutine amb_accum(tendPool, nCells, maxLevelCell, nEdges, nVertLevels, &
+       layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, vertAleTransportTop)
     type (mpas_pool_type), intent(inout) :: tendPool
+    integer, intent(in) :: nCells, maxLevelCell(:), nEdges, nVertLevels
     real (kind=RKIND), dimension(:,:), intent(in) :: &
          layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, vertAleTransportTop
     real (kind=RKIND), dimension(:,:), pointer :: test, t1
@@ -164,9 +165,10 @@ contains
     end if
   end subroutine amb_accum
 
-  subroutine amb_fill(tendPool, layerThickness, layerThicknessEdge, zMid, &
-       normalThicknessFlux, vertAleTransportTop)
+  subroutine amb_fill(tendPool, nCells, maxLevelCell, nEdges, nVertLevels, &
+       layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, vertAleTransportTop)
     type (mpas_pool_type), intent(inout) :: tendPool
+    integer, intent(in) :: nCells, maxLevelCell(:), nEdges, nVertLevels
     real (kind=RKIND), intent(out) :: normalThicknessFlux(:,:)
     real (kind=RKIND), intent(out), dimension(:,:), pointer :: layerThickness, &
          layerThicknessEdge, zMid, vertAleTransportTop
@@ -184,9 +186,9 @@ contains
     call mpas_pool_get_array(tendPool, 'scAccumVertAleTransportTop', vertAleTransportTop)
   end subroutine amb_fill
 
-  subroutine amb_update(tendPool, maxLevelCell, nCells, dt, tcur, ttend, lyrnew, tnew)
+  subroutine amb_update(tendPool, nCells, maxLevelCell, dt, tcur, ttend, lyrnew, tnew)
     type (mpas_pool_type), intent(inout) :: tendPool
-    integer, intent(in) :: maxLevelCell(:), nCells
+    integer, intent(in) :: nCells, maxLevelCell(:)
     real (kind=RKIND), intent(in) :: dt, tcur(:,:,:), ttend(:,:,:), lyrnew(:,:)
     real (kind=RKIND), intent(out) :: tnew(:,:,:)
 
@@ -194,10 +196,17 @@ contains
     integer :: ic, k
 
     if (modulo(timestep, supercycle) /= 0) then
-       tnew(:,:,:) = tcur(:,:,:)
+       !$omp parallel do private(k)
+       do ic = 1, nCells
+          do k = 1, maxLevelCell(ic)
+             tnew(:,k,ic) = tcur(:,k,ic)
+          end do
+       end do
+       !$omp end do
        return
     end if
     call mpas_pool_get_array(tendPool, 'scLayerThickness0', layerThickness0)
+    !$omp parallel do private(k)
     do ic = 1, nCells
        do k = 1, maxLevelCell(ic)
           tnew(:,k,ic) = (tcur(:,k,ic)*layerThickness0(k,ic) + &
@@ -205,78 +214,9 @@ contains
                          lyrnew(k,ic)
        end do
     end do
+    !$omp end do
+    ! Reset time step counter to start of tracer time step.
+    timestep = 0
   end subroutine amb_update
-
-  subroutine amb_check_debug_tracers(tendPool, maxLevelCell, nCells, areaCell, h, q)
-    type (mpas_pool_type), intent(inout) :: tendPool
-    integer, intent(in) :: maxLevelCell(:), nCells
-    real (kind=RKIND), intent(in) :: areaCell(:), q(:,:,:)
-    real (kind=RKIND), intent(in), target :: h(:,:)
-
-    integer, parameter :: conout = 999
-
-    real (kind=RKIND), save :: overall_maxerr = 0, mass0(ndbgq)
-    integer, save :: consistency_output_cnt = 0, next_timestep = 1
-
-    integer :: idx, ic, k, iq, ierr
-    real (kind=RKIND) :: maxerr, mass, send(ndbgq), recv(ndbgq), err
-    real (kind=RKIND), pointer :: huse(:,:)
-
-    if (.false. .and. modulo(timestep-1, 10) == 0) then
-       ! Debug tracer 3 mixing ratio is uniformly 42. Check departure from that.
-       maxerr = 0
-       do ic = 1, nCells
-          do k = 1, maxLevelCell(ic)
-             maxerr = max(maxerr, abs(q(3,k,ic) - 42.0d0))
-          end do
-       end do
-       if (maxerr > 1.0d-14*42.0d0 .and. maxerr > overall_maxerr .and. &
-           consistency_output_cnt < conout) then
-          print *, 'amb> q consistency', timestep, mpirank, maxerr
-          consistency_output_cnt = consistency_output_cnt + 1
-          if (consistency_output_cnt == conout .and. amroot) &
-               print *,'amb> q consistency silenced'
-       end if
-       overall_maxerr = max(overall_maxerr, maxerr)
-    end if
-
-    if (timestep == next_timestep) then
-       if (timestep == 1 .and. sc_use) then
-          call mpas_pool_get_array(tendPool, 'scLayerThickness0', huse)
-       else
-          huse => h
-       end if
-       do iq = 1, ndbgq
-          mass = 0
-          do ic = 1, nCells
-             do k = 1, maxLevelCell(ic)
-                mass = mass + areaCell(ic)*huse(k,ic)*q(iq,k,ic)
-             end do
-          end do
-          send(iq) = mass
-       end do
-       call mpi_allreduce(send, recv, ndbgq, MPI_REAL8, MPI_SUM, comm_global, ierr)
-       if (amroot) then
-          do iq = 1, ndbgq
-             mass = recv(iq)
-             if (timestep == 1) then
-                mass0(iq) = mass
-                print '(a,i2,es23.15)','amb> mass0', iq, mass
-             else
-                err = abs(mass - mass0(iq))/mass0(iq)
-                if (err > 1e-14) then
-                   print '(a,i2,i4,es11.3,es23.15)', 'amb> q mass', iq, timestep, err, mass
-                end if
-             end if
-          end do
-       end if
-       next_timestep = timestep + 50
-       if (supercycle > 0) then
-          do while (modulo(next_timestep, supercycle) /= 0)
-             next_timestep = next_timestep + 1
-          end do
-       end if
-    end if
-  end subroutine amb_check_debug_tracers
 
 end module amb
