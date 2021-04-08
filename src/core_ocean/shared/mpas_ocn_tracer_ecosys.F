@@ -35,7 +35,7 @@ module ocn_tracer_ecosys
    use bgc_mod
    use bgc_parms
 
-   use amb
+   use ocn_tracer_supercycle
 
    implicit none
 
@@ -357,9 +357,9 @@ contains
 
       subcycle = .false.
       supercycle = 1
-      if (amb_use()) then
+      if (ocn_tracer_supercycle_use()) then
          subcycle = config_ecosysTracers_subcycle_param
-         if (subcycle) supercycle = amb_get_supercycle()
+         if (subcycle) supercycle = ocn_tracer_supercycle_get_supercycle()
       end if
 
       err = 0
@@ -1110,8 +1110,9 @@ contains
         call mpas_pool_get_array(ecosysSeaIceCoupling, 'iceFluxPhytoC', iceFluxPhytoC)
      endif
 
-     if (amb_get_supercycle() == 1 .or. &
-          modulo(amb_get_timestep(), amb_get_supercycle()) == 1) then
+     if (ocn_tracer_supercycle_get_supercycle() == 1 .or. &
+          modulo(ocn_tracer_supercycle_get_timestep(), &
+                 ocn_tracer_supercycle_get_supercycle()) == 1) then
         flux = 0
      end if
      
@@ -1363,7 +1364,7 @@ contains
       column = 1
       iLevelSurface = 1
       
-      if (amb_use()) supcyc = amb_get_supercycle()
+      if (ocn_tracer_supercycle_use()) supcyc = ocn_tracer_supercycle_get_supercycle()
 
       !DWJ 08/05/2016: This loop needs OpenMP added to it.
       do iCell=1,nCellsSolve
@@ -1391,7 +1392,7 @@ contains
          BGC_input%BGC_tracers(1,column,BGC_indices%sio3_ind) = ecosysTracers(ecosysIndices%sio3_ind,1,iCell)
          BGC_input%BGC_tracers(1,column,BGC_indices%o2_ind) = ecosysTracers(ecosysIndices%o2_ind,1,iCell)
 
-         if (amb_use()) then
+         if (ocn_tracer_supercycle_use()) then
             ecosysSurfaceFlux(1:27,iCell) = ecosysSurfaceFlux(1:27,iCell) / supcyc
 
             BGC_forcing%depositionFlux(column,BGC_indices%no3_ind)    = ecosysSurfaceFlux( 1,iCell)

@@ -32,8 +32,7 @@ module ocn_vmix
    use ocn_vmix_cvmix
    use ocn_vmix_coefs_redi
    use ocn_diagnostics_variables
-
-   use amb
+   use ocn_tracer_supercycle
 
    implicit none
    private
@@ -1123,10 +1122,10 @@ contains
 
          if ( groupItr % memberType == MPAS_POOL_FIELD ) then
             dtuse = dt
-            if (amb_use()) then
+            if (ocn_tracer_supercycle_use()) then
                if (trim(groupItr % memberName) /= 'activeTracers') then
-                  if (.not. amb_is_tracer_step()) cycle
-                  dtuse = amb_get_supercycle()*dt
+                  if (.not. ocn_tracer_supercycle_is_tracer_step()) cycle
+                  dtuse = ocn_tracer_supercycle_get_supercycle()*dt
                end if
             end if
 

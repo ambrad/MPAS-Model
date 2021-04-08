@@ -64,7 +64,7 @@ module ocn_tendency
    use ocn_wetting_drying
    use ocn_vel_tidal_potential
 
-   use amb
+   use ocn_tracer_supercycle
 
    implicit none
    private
@@ -627,12 +627,13 @@ contains
                layerThicknessLcl => layerThickness
                zMidLcl => zMid
                vertAleTransportTopLcl => vertAleTransportTop
-               if (amb_use()) then
+               if (ocn_tracer_supercycle_use()) then
                   poolidx = poolidx + 1
                   active_tracers = trim(groupItr%memberName) == 'activeTracers'
                   if (active_tracers) then
                      if (poolidx /= 1) print *, 'amb> passive must come after active'
-                     call amb_accum(tendPool, nCells, maxLevelCell, nEdges, nVertLevels, &
+                     call ocn_tracer_supercycle_accum( &
+                          tendPool, nCells, maxLevelCell, nEdges, nVertLevels, &
                           layerThicknessLcl, layerThickEdgeLcl, zMidLcl, &
                           normalThicknessFlux, vertAleTransportTopLcl)
                   else
@@ -644,9 +645,10 @@ contains
                              nCellsSolve, tracerGroupSurfaceFlux)
                         zero_surface_flux = .false.
                      end if
-                     if (.not. amb_is_tracer_step()) cycle
-                     dtuse = amb_get_supercycle()*dt
-                     call amb_fill(tendPool, nCells, maxLevelCell, nEdges, nVertLevels, &
+                     if (.not. ocn_tracer_supercycle_is_tracer_step()) cycle
+                     dtuse = ocn_tracer_supercycle_get_supercycle()*dt
+                     call ocn_tracer_supercycle_fill( &
+                          tendPool, nCells, maxLevelCell, nEdges, nVertLevels, &
                           layerThicknessLcl, layerThickEdgeLcl, zMidLcl, &
                           normalThicknessFlux, vertAleTransportTopLcl)
                   end if

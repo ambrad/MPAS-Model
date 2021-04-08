@@ -43,7 +43,7 @@ module ocn_time_integration_split
 
    use ocn_effective_density_in_land_ice
 
-   use amb
+   use ocn_tracer_supercycle
    !use act
 
    implicit none
@@ -389,14 +389,15 @@ module ocn_time_integration_split
       n_bcl_iter(config_n_ts_iter) = config_n_bcl_iter_end
 
       do split_explicit_step = 1, config_n_ts_iter
-         if (amb_use()) then
-            call amb_set_split_explicit_step(split_explicit_step, config_n_ts_iter)
+         if (ocn_tracer_supercycle_use()) then
+            call ocn_tracer_supercycle_set_split_explicit_step( &
+                 split_explicit_step, config_n_ts_iter)
             block => domain % blocklist
             do while (associated(block))
                call mpas_pool_get_array(statePool, 'layerThickness', layerThicknessCur, 1)
                call mpas_pool_get_subpool(block % structs, 'tend', tendPool)
-               call amb_set_layerThickness0(tendPool, nCells, maxLevelCell, &
-                    layerThicknessCur)
+               call ocn_tracer_supercycle_set_layerThickness0( &
+                    tendPool, nCells, maxLevelCell, layerThicknessCur)
                block => block % next
             end do
          end if
@@ -1524,7 +1525,10 @@ module ocn_time_integration_split
                ! Only compute tendencies for active tracers if activeTracersOnly flag is true.
                is_active = trim(groupItr % memberName)=='activeTracersTend'
                exchange = .not. activeTracersOnly .or. is_active
-               if (amb_use()) exchange = exchange .and. (is_active .or. amb_is_tracer_step())
+               if (ocn_tracer_supercycle_use()) then
+                  exchange = exchange .and. &
+                       (is_active .or. ocn_tracer_supercycle_is_tracer_step())
+               end if
                if (exchange) call mpas_dmpar_field_halo_exch(domain, groupItr % memberName)
             end if
          end do
@@ -1739,9 +1743,10 @@ module ocn_time_integration_split
                         call mpas_pool_get_array(tracersTendPool, modifiedGroupName, tracersGroupTend)
 
                         updated_tracers = .false.
-                        if (amb_use()) then
+                        if (ocn_tracer_supercycle_use()) then
                            if (trim(groupItr % memberName) /= 'activeTracers') then
-                              call amb_update(tendPool, nCells, maxLevelCell, dt, tracersGroupCur, &
+                              call ocn_tracer_supercycle_update( &
+                                   tendPool, nCells, maxLevelCell, dt, tracersGroupCur, &
                                    tracersGroupTend, layerThicknessNew, tracersGroupNew)
                               updated_tracers = .true.
                            end if
@@ -1936,8 +1941,8 @@ module ocn_time_integration_split
       do while ( mpas_pool_get_next_member(tracersPool, groupItr) )
          if ( groupItr % memberType == MPAS_POOL_FIELD ) then
             is_active = trim(groupItr % memberName) == 'activeTracers'
-            if (amb_use()) then
-               if (.not. is_active .and. .not. amb_is_tracer_step()) cycle
+            if (ocn_tracer_supercycle_use()) then
+               if (.not. is_active .and. .not. ocn_tracer_supercycle_is_tracer_step()) cycle
             end if
             call mpas_dmpar_field_halo_exch(domain, groupItr % memberName, timeLevel=2)
          end if

@@ -36,8 +36,7 @@ module ocn_time_integration
    use ocn_time_integration_rk4
    use ocn_time_integration_split
    use ocn_time_integration_si
-
-   use amb
+   use ocn_tracer_supercycle
 
    implicit none
    private
@@ -105,7 +104,7 @@ module ocn_time_integration
 
       type (MPAS_Time_type) :: xtime_timeType, simulationStartTime_timeType
 
-      call amb_set_timestep()
+      call ocn_tracer_supercycle_set_timestep()
 
       if (rk4On) then
          call ocn_time_integrator_rk4(domain, dt)

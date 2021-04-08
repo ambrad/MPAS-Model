@@ -41,7 +41,6 @@ module ocn_time_integration_rk4
 
    use ocn_effective_density_in_land_ice
 
-   use amb
    !use act
 
    implicit none

@@ -1,10 +1,11 @@
-module amb
+module ocn_tracer_supercycle
   use mpas_kind_types
   use ocn_config
   use mpi
 
   implicit none
   private
+  save
 
   ! settings
   integer :: supercycle
@@ -15,51 +16,52 @@ module amb
   integer :: timestep, split_explicit_step, n_ts_iter
 
   public :: &
-       amb_use, &
-       amb_set_timestep, &
-       amb_set_split_explicit_step, &
-       amb_get_timestep, &
-       amb_get_supercycle, &
-       amb_is_tracer_step, &
-       amb_set_layerThickness0, &
-       amb_accum, &
-       amb_fill, &
-       amb_update
+       ocn_tracer_supercycle_use, &
+       ocn_tracer_supercycle_set_timestep, &
+       ocn_tracer_supercycle_set_split_explicit_step, &
+       ocn_tracer_supercycle_get_timestep, &
+       ocn_tracer_supercycle_get_supercycle, &
+       ocn_tracer_supercycle_is_tracer_step, &
+       ocn_tracer_supercycle_set_layerThickness0, &
+       ocn_tracer_supercycle_accum, &
+       ocn_tracer_supercycle_fill, &
+       ocn_tracer_supercycle_update
 
 contains
 
-  function amb_use() result(u)
+  function ocn_tracer_supercycle_use() result(u)
     logical :: u
     u = sc_use
-  end function amb_use
+  end function ocn_tracer_supercycle_use
 
-  subroutine amb_set_timestep()
-    call amb_init()
+  subroutine ocn_tracer_supercycle_set_timestep()
+    call ocn_tracer_supercycle_init()
     timestep = timestep + 1
-  end subroutine amb_set_timestep
+  end subroutine ocn_tracer_supercycle_set_timestep
 
-  subroutine amb_set_split_explicit_step(split_explicit_step_in, n_ts_iter_in)
+  subroutine ocn_tracer_supercycle_set_split_explicit_step( &
+       split_explicit_step_in, n_ts_iter_in)
     integer, intent(in) :: split_explicit_step_in, n_ts_iter_in
     split_explicit_step = split_explicit_step_in
     n_ts_iter = n_ts_iter_in
-  end subroutine amb_set_split_explicit_step
+  end subroutine ocn_tracer_supercycle_set_split_explicit_step
 
-  function amb_get_timestep() result(ts)
+  function ocn_tracer_supercycle_get_timestep() result(ts)
     integer :: ts
     ts = timestep
-  end function amb_get_timestep
+  end function ocn_tracer_supercycle_get_timestep
 
-  function amb_get_supercycle() result(sc)
+  function ocn_tracer_supercycle_get_supercycle() result(sc)
     integer :: sc
     sc = supercycle
-  end function amb_get_supercycle
+  end function ocn_tracer_supercycle_get_supercycle
 
-  function amb_is_tracer_step() result(b)
+  function ocn_tracer_supercycle_is_tracer_step() result(b)
     logical :: b
     b = modulo(timestep, supercycle) == 0
-  end function amb_is_tracer_step
+  end function ocn_tracer_supercycle_is_tracer_step
 
-  subroutine amb_init()
+  subroutine ocn_tracer_supercycle_init()
     integer :: err, mpirank
     logical :: amroot
 
@@ -81,9 +83,10 @@ contains
        print '(a,l,a,i2,a,l)', 'amb> sc use', sc_use, &
             ' sc', supercycle, ' subcyc', config_ecosysTracers_subcycle_param
     end if
-  end subroutine amb_init
+  end subroutine ocn_tracer_supercycle_init
 
-  subroutine amb_set_layerThickness0(tendPool, nCells, maxLevelCell, layerThickness)
+  subroutine ocn_tracer_supercycle_set_layerThickness0(tendPool, nCells, maxLevelCell, &
+       layerThickness)
     type (mpas_pool_type), intent(inout) :: tendPool
     integer, intent(in) :: nCells, maxLevelCell(:)
     real (kind=RKIND), intent(in) :: layerThickness(:,:)
@@ -105,9 +108,9 @@ contains
        !$omp end do
        !$omp end parallel
     end if
-  end subroutine amb_set_layerThickness0
+  end subroutine ocn_tracer_supercycle_set_layerThickness0
 
-  subroutine amb_accum(tendPool, nCells, maxLevelCell, nEdges, nVertLevels, &
+  subroutine ocn_tracer_supercycle_accum(tendPool, nCells, maxLevelCell, nEdges, nVertLevels, &
        layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, vertAleTransportTop)
     type (mpas_pool_type), intent(inout) :: tendPool
     integer, intent(in) :: nCells, maxLevelCell(:), nEdges, nVertLevels
@@ -177,7 +180,7 @@ contains
     !$omp end do
     !$omp end parallel
     
-    if (amb_is_tracer_step()) then
+    if (ocn_tracer_supercycle_is_tracer_step()) then
        !$omp parallel
        !$omp do private(k)
        do ic = 1, nCells
@@ -200,9 +203,9 @@ contains
        !$omp end do
        !$omp end parallel
     end if
-  end subroutine amb_accum
+  end subroutine ocn_tracer_supercycle_accum
 
-  subroutine amb_fill(tendPool, nCells, maxLevelCell, nEdges, nVertLevels, &
+  subroutine ocn_tracer_supercycle_fill(tendPool, nCells, maxLevelCell, nEdges, nVertLevels, &
        layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, vertAleTransportTop)
     type (mpas_pool_type), intent(inout) :: tendPool
     integer, intent(in) :: nCells, maxLevelCell(:), nEdges, nVertLevels
@@ -227,9 +230,10 @@ contains
     end do
     !$omp end do
     !$omp end parallel
-  end subroutine amb_fill
+  end subroutine ocn_tracer_supercycle_fill
 
-  subroutine amb_update(tendPool, nCells, maxLevelCell, dt, tcur, ttend, lyrnew, tnew)
+  subroutine ocn_tracer_supercycle_update(tendPool, nCells, maxLevelCell, &
+       dt, tcur, ttend, lyrnew, tnew)
     type (mpas_pool_type), intent(inout) :: tendPool
     integer, intent(in) :: nCells, maxLevelCell(:)
     real (kind=RKIND), intent(in) :: dt, tcur(:,:,:), ttend(:,:,:), lyrnew(:,:)
@@ -264,6 +268,6 @@ contains
     !$omp end parallel
     ! Reset time step counter to start of tracer time step.
     timestep = 0
-  end subroutine amb_update
+  end subroutine ocn_tracer_supercycle_update
 
-end module amb
+end module ocn_tracer_supercycle
