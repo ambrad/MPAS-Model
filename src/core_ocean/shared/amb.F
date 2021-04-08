@@ -11,10 +11,6 @@ module amb
   logical :: sc_use
   ! initialization
   logical :: inited = .false.
-  integer :: mpirank, comm_global
-  logical :: amroot
-  ! debug
-  integer, parameter :: ndbgq = 3, verbose = 0
   ! state
   integer :: timestep, split_explicit_step, n_ts_iter
 
@@ -28,9 +24,7 @@ module amb
        amb_set_layerThickness0, &
        amb_accum, &
        amb_fill, &
-       amb_update, &
-       ! for now
-       amb_init, amb_amroot
+       amb_update
 
 contains
 
@@ -39,9 +33,8 @@ contains
     u = sc_use
   end function amb_use
 
-  subroutine amb_set_timestep(comm)
-    integer, intent(in) :: comm
-    call amb_init(comm)
+  subroutine amb_set_timestep()
+    call amb_init()
     timestep = timestep + 1
   end subroutine amb_set_timestep
 
@@ -66,32 +59,16 @@ contains
     b = modulo(timestep, supercycle) == 0
   end function amb_is_tracer_step
 
-  function amb_amroot() result(ar)
-    logical :: ar
-    ar = amroot
-  end function amb_amroot
-
-  function amb_get_rank() result(r)
-    integer :: r
-    r = mpirank
-  end function amb_get_rank
-
-  subroutine amb_init(comm)
-    integer, intent(in), optional :: comm
-
-    integer :: err
+  subroutine amb_init()
+    integer :: err, mpirank
+    logical :: amroot
 
     if (inited) return
     inited = .true.
 
-    if (present(comm)) then
-       comm_global = comm
-    else
-       comm_global = MPI_COMM_WORLD
-    end if
     timestep = 0
 
-    call mpi_comm_rank(comm_global, mpirank, err)
+    call mpi_comm_rank(MPI_COMM_WORLD, mpirank, err)
     amroot = mpirank == 0
 
     sc_use = .false.

@@ -105,7 +105,7 @@ module ocn_time_integration
 
       type (MPAS_Time_type) :: xtime_timeType, simulationStartTime_timeType
 
-      call amb_set_timestep(domain%dminfo%comm)
+      call amb_set_timestep()
 
       if (rk4On) then
          call ocn_time_integrator_rk4(domain, dt)

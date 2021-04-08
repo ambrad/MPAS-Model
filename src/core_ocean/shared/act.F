@@ -10,7 +10,7 @@ module act
   use mpas_stream_manager
   use mpas_dmpar
 
-  use amb, only: amb_init, amb_amroot
+  use mpi
 
   implicit none
   private
@@ -24,6 +24,8 @@ module act
      integer :: state = 0
      integer :: flow
   end type act_t
+
+  logical :: amroot
 
   type (act_t) :: a
 
@@ -55,7 +57,7 @@ contains
     
     err = 0
     call act_init()
-    if (amb_amroot()) print *,'amb> act_init_setup'
+    if (amroot) print *,'amb> act_init_setup'
 
     block_ptr => domain % blocklist
     do while(associated(block_ptr))
@@ -202,11 +204,12 @@ contains
 
   subroutine act_init()
     character (len=255) :: key
-    integer :: err, val
+    integer :: err, val, mpirank
 
     if (a%state /= 0) return
 
-    call amb_init()
+    call mpi_comm_rank(MPI_COMM_WORLD, mpirank, err)
+    amroot = mpirank == 0
 
     a%state = 1
     call get_environment_variable("amb_act", key, status=err)
@@ -214,7 +217,7 @@ contains
        read(key, '(i)', iostat=err) val
        if (val /= 0) a%state = 2
     end if
-    if (amb_amroot()) print *,'amb> act', a%state == 2
+    if (amroot) print *,'amb> act', a%state == 2
 
     if (a%state /= 2) return
 
