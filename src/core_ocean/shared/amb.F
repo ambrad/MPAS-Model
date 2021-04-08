@@ -112,12 +112,21 @@ contains
     real (kind=RKIND), intent(in) :: layerThickness(:,:)
 
     real (kind=RKIND), pointer :: layerThickness0(:,:)
+    integer :: ic, k
 
     if (split_explicit_step /= n_ts_iter) return
 
     if (modulo(timestep-1, supercycle) == 0) then
        call mpas_pool_get_array(tendPool, 'scLayerThickness0', layerThickness0)
-       layerThickness0(:,:) = layerThickness(:,:)
+       !$omp parallel
+       !$omp parallel do private(k)
+       do ic = 1, nCells
+          do k = 1, maxLevelCell(ic)
+             layerThickness0(k,ic) = layerThickness(k,ic)
+          end do
+       end do
+       !$omp end do
+       !$omp end parallel
     end if
   end subroutine amb_set_layerThickness0
 
@@ -129,8 +138,10 @@ contains
          layerThickness, layerThicknessEdge, zMid, normalThicknessFlux, vertAleTransportTop
     real (kind=RKIND), dimension(:,:), pointer :: test, t1
 
-    real (kind=RKIND), dimension(:,:), pointer :: accumLayerThickness, accumLayerThicknessEdge, &
-         accumZMid, accumNormalThicknessFlux, accumVertAleTransportTop
+    real (kind=RKIND), dimension(:,:), pointer :: accumLayerThickness, &
+         accumLayerThicknessEdge, accumZMid, accumNormalThicknessFlux, &
+         accumVertAleTransportTop
+    integer :: ic, ie, k
 
     if (split_explicit_step /= n_ts_iter) return
 
@@ -141,27 +152,76 @@ contains
     call mpas_pool_get_array(tendPool, 'scAccumVertAleTransportTop', accumVertAleTransportTop)
 
     if (modulo(timestep-1, supercycle) == 0) then
-       if (amroot .and. verbose > 0) print *,'amb> accum zero'
-       accumLayerThickness = 0
-       accumLayerThicknessEdge = 0
-       accumZMid = 0
-       accumNormalThicknessFlux = 0
-       accumVertAleTransportTop = 0
+       !$omp parallel
+       !$omp do private(k)
+       do ic = 1, nCells
+          do k = 1, maxLevelCell(ic)
+             accumLayerThickness(k,ic) = 0
+             accumZMid(k,ic) = 0
+          end do
+          do k = 1, nVertLevels+1
+             accumVertAleTransportTop(k,ic) = 0
+          end do
+       end do
+       !$omp end do
+       !$omp do private(k)
+       do ie = 1, nEdges
+          do k = 1, nVertLevels
+             accumLayerThicknessEdge(k,ie) = 0
+             accumNormalThicknessFlux(k,ie) = 0
+          end do
+       end do
+       !$omp end do
+       !$omp end parallel
     end if
 
-    if (amroot .and. verbose > 0) print *,'amb> accum accum',timestep,split_explicit_step
-    accumZMid = accumZMid + zMid
-    accumLayerThickness = accumLayerThickness + layerThickness
-    accumNormalThicknessFlux = accumNormalThicknessFlux + normalThicknessFlux
-    accumVertAleTransportTop = accumVertAleTransportTop + vertAleTransportTop
-    accumLayerThicknessEdge = accumLayerThicknessEdge + layerThicknessEdge
-
+    !$omp parallel
+    !$omp do private(k)
+    do ic = 1, nCells
+       do k = 1, maxLevelCell(ic)
+          accumLayerThickness(k,ic) = accumLayerThickness(k,ic) + layerThickness(k,ic)
+          accumZMid(k,ic) = accumZMid(k,ic) + zMid(k,ic)
+       end do
+       do k = 1, nVertLevels+1
+          accumVertAleTransportTop(k,ic) = accumVertAleTransportTop(k,ic) + &
+               vertAleTransportTop(k,ic)
+       end do
+    end do
+    !$omp end do
+    !$omp do private(k)
+    do ie = 1, nEdges
+       do k = 1, nVertLevels
+          accumLayerThicknessEdge(k,ie) = accumLayerThicknessEdge(k,ie) + &
+               layerThicknessEdge(k,ie)
+          accumNormalThicknessFlux(k,ie) = accumNormalThicknessFlux(k,ie) + &
+               normalThicknessFlux(k,ie)
+       end do
+    end do
+    !$omp end do
+    !$omp end parallel
+    
     if (amb_is_tracer_step()) then
-       accumLayerThickness = accumLayerThickness/supercycle
-       accumZMid = accumZMid/supercycle
-       accumNormalThicknessFlux = accumNormalThicknessFlux/supercycle
-       accumVertAleTransportTop = accumVertAleTransportTop/supercycle
-       accumLayerThicknessEdge = accumLayerThicknessEdge/supercycle
+       !$omp parallel
+       !$omp do private(k)
+       do ic = 1, nCells
+          do k = 1, maxLevelCell(ic)
+             accumLayerThickness(k,ic) = accumLayerThickness(k,ic)/supercycle
+             accumZMid(k,ic) = accumZMid(k,ic)/supercycle
+          end do
+          do k = 1, nVertLevels+1
+             accumVertAleTransportTop(k,ic) = accumVertAleTransportTop(k,ic)/supercycle
+          end do
+       end do
+       !$omp end do
+       !$omp do private(k)
+       do ie = 1, nEdges
+          do k = 1, nVertLevels
+             accumLayerThicknessEdge(k,ie) = accumLayerThicknessEdge(k,ie)/supercycle
+             accumNormalThicknessFlux(k,ie) = accumNormalThicknessFlux(k,ie)/supercycle
+          end do
+       end do
+       !$omp end do
+       !$omp end parallel
     end if
   end subroutine amb_accum
 
@@ -174,16 +234,22 @@ contains
          layerThicknessEdge, zMid, vertAleTransportTop
 
     real (kind=RKIND), dimension(:,:), pointer :: accumNormalThicknessFlux
-
-    if (split_explicit_step /= n_ts_iter) print *, 'amb> amb_fill: should not be here'
-    if (amroot .and. verbose > 0) print *,'amb> fill',timestep,split_explicit_step
+    integer :: ie, k
 
     call mpas_pool_get_array(tendPool, 'scAccumNormalThicknessFlux', accumNormalThicknessFlux)
-    normalThicknessFlux = accumNormalThicknessFlux
     call mpas_pool_get_array(tendPool, 'scAccumLayerThickness', layerThickness)
     call mpas_pool_get_array(tendPool, 'scAccumLayerThicknessEdge', layerThicknessEdge)
     call mpas_pool_get_array(tendPool, 'scAccumZMid', zMid)
     call mpas_pool_get_array(tendPool, 'scAccumVertAleTransportTop', vertAleTransportTop)
+    !$omp end do
+    !$omp do private(k)
+    do ie = 1, nEdges
+       do k = 1, nVertLevels
+          normalThicknessFlux(k,ie) = accumNormalThicknessFlux(k,ie)
+       end do
+    end do
+    !$omp end do
+    !$omp end parallel
   end subroutine amb_fill
 
   subroutine amb_update(tendPool, nCells, maxLevelCell, dt, tcur, ttend, lyrnew, tnew)
@@ -196,17 +262,20 @@ contains
     integer :: ic, k
 
     if (modulo(timestep, supercycle) /= 0) then
-       !$omp parallel do private(k)
+       !$omp parallel
+       !$omp do private(k)
        do ic = 1, nCells
           do k = 1, maxLevelCell(ic)
              tnew(:,k,ic) = tcur(:,k,ic)
           end do
        end do
        !$omp end do
+       !$omp end parallel
        return
     end if
     call mpas_pool_get_array(tendPool, 'scLayerThickness0', layerThickness0)
-    !$omp parallel do private(k)
+    !$omp parallel
+    !$omp do private(k)
     do ic = 1, nCells
        do k = 1, maxLevelCell(ic)
           tnew(:,k,ic) = (tcur(:,k,ic)*layerThickness0(k,ic) + &
@@ -215,6 +284,7 @@ contains
        end do
     end do
     !$omp end do
+    !$omp end parallel
     ! Reset time step counter to start of tracer time step.
     timestep = 0
   end subroutine amb_update
